@@ -8,20 +8,28 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:Arial;touch-action:none}
 #info{position:fixed;top:6px;left:6px;color:#fff;z-index:10;background:rgba(0,0,0,.55);padding:5px 9px;border-radius:6px;font-size:11px;line-height:1.4}
-#hud{position:fixed;bottom:0;left:0;right:0;z-index:10;display:flex;justify-content:center;gap:6px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:linear-gradient(to top,rgba(0,0,0,.6),transparent)}
-.btn{width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.4);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;user-select:none}
+#hudWrap{position:fixed;bottom:0;left:0;right:0;z-index:10;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:linear-gradient(to top,rgba(0,0,0,.7),transparent)}
+#hudRow1,#hudRow2{display:flex;justify-content:center;gap:5px;transition:transform .25s ease}
+#hudWrap.show2 #hudRow1{display:none}
+#hudWrap.show2 #hudRow2{display:flex}
+#hudRow1.hidden{display:none}
+#pageDots{display:flex;justify-content:center;gap:6px;margin-top:4px}
+.dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.4)}
+.dot.on{background:#fff}
+.btn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.4);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;user-select:none}
 .btn.active{transform:scale(.92);background:rgba(255,80,80,.5);border-color:#f66}
-#pControls{position:fixed;bottom:75px;left:0;right:0;z-index:11;display:none;justify-content:center;gap:10px;padding:0 8px}
+#pControls{position:fixed;bottom:110px;left:0;right:0;z-index:11;display:none;justify-content:center;gap:8px;padding:0 8px}
 #pControls.on{display:flex}
-.pbtn{width:52px;height:52px;border-radius:50%;background:rgba(0,100,200,.55);border:2px solid rgba(255,255,255,.6);color:#fff;font-size:19px;display:flex;align-items:center;justify-content:center;user-select:none}
+.pbtn{width:50px;height:50px;border-radius:50%;background:rgba(0,100,200,.55);border:2px solid rgba(255,255,255,.6);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;user-select:none}
 .pbtn:active{background:rgba(0,150,255,.9)}
 #exit{position:fixed;top:8px;right:8px;z-index:11;display:none;background:rgba(200,0,0,.75);color:#fff;border:2px solid #fff;border-radius:8px;padding:8px 14px;font-size:13px}
 #exit.on{display:block}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20;transition:opacity .3s}
+#shake{position:fixed;inset:0;pointer-events:none;z-index:21}
 </style>
 </head>
 <body>
-<div id="info"><b>Выбери → тапни по цели</b><br>Свайп — камера · 2 пальца — зум</div>
+<div id="info"><b>Выбери инструмент → тапни</b><br>Свайп по кнопкам — 2-я страница</div>
 <div id="flash"></div>
 <div id="exit">✕ Выйти из самолёта</div>
 <div id="pControls">
@@ -30,22 +38,35 @@ html,body{width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:
 <div class="pbtn" id="pD">▼</div>
 <div class="pbtn" id="pR">►</div>
 </div>
-<div id="hud">
+<div id="hudWrap">
+<div id="hudRow1">
 <div class="btn active" data-mode="bomb">💣</div>
 <div class="btn" data-mode="grenade">✋</div>
 <div class="btn" data-mode="rocket">🚀</div>
 <div class="btn" data-mode="plane">✈️</div>
 <div class="btn" data-mode="nuke">☢️</div>
 </div>
+<div id="hudRow2" style="display:none">
+<div class="btn" data-mode="fire">🔥</div>
+<div class="btn" data-mode="lightning">⚡</div>
+<div class="btn" data-mode="heli">🚁</div>
+<div class="btn" data-mode="tornado">🌪️</div>
+<div class="btn" data-mode="cluster">🧨</div>
+<div class="btn" data-mode="tsunami">🌊</div>
+<div class="btn" data-mode="quake">🌍</div>
+</div>
+<div id="pageDots"><div class="dot on"></div><div class="dot"></div></div>
+</div>
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 <script>
+// ==== ОСНОВНОЕ ====
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x87ceeb);
 scene.fog=new THREE.Fog(0x87ceeb,150,600);
 const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,2000);
 camera.position.set(50,60,100);
 const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.3));
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.2));
 renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
 scene.add(new THREE.HemisphereLight(0xffffff,0x445566,1.1));
@@ -53,53 +74,34 @@ const sun=new THREE.DirectionalLight(0xffffff,1.3);
 sun.position.set(80,150,60);
 scene.add(sun);
 
-// ЗЕМЛЯ
+// ==== ЗЕМЛЯ ====
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(1200,1200),new THREE.MeshLambertMaterial({color:0x3a5a3a}));
 ground.rotation.x=-Math.PI/2;
 scene.add(ground);
 
-// ГОРЫ ВОКРУГ ГОРОДА
-const mountains=[];
+// ==== ГОРЫ ====
 function mkMountain(x,z,r,h){
-  const cone=new THREE.Mesh(
-    new THREE.ConeGeometry(r,h,8),
-    new THREE.MeshLambertMaterial({color:0x667755,flatShading:true})
-  );
-  cone.position.set(x,h/2,z);
-  cone.rotation.y=Math.random()*Math.PI;
-  scene.add(cone);mountains.push(cone);
-  // снежная шапка
+  const cone=new THREE.Mesh(new THREE.ConeGeometry(r,h,8),new THREE.MeshLambertMaterial({color:0x667755,flatShading:true}));
+  cone.position.set(x,h/2,z);cone.rotation.y=Math.random()*Math.PI;
+  scene.add(cone);
   if(h>25){
-    const cap=new THREE.Mesh(
-      new THREE.ConeGeometry(r*0.4,h*0.3,8),
-      new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true})
-    );
-    cap.position.set(x,h*0.85,z);
-    cap.rotation.y=cone.rotation.y;
+    const cap=new THREE.Mesh(new THREE.ConeGeometry(r*.4,h*.3,8),new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true}));
+    cap.position.set(x,h*.85,z);cap.rotation.y=cone.rotation.y;
     scene.add(cap);
   }
 }
-// кольцо гор по краям карты (радиус 250-400)
 for(let a=0;a<Math.PI*2;a+=Math.PI/16){
   const r=250+Math.random()*130;
-  const x=Math.cos(a)*r;
-  const z=Math.sin(a)*r;
-  const h=15+Math.random()*30;
-  const rr=10+Math.random()*15;
-  mkMountain(x,z,rr,h);
-}
-// пара холмов ближе к городу
-for(let i=0;i<8;i++){
-  const a=Math.random()*Math.PI*2;
-  const r=180+Math.random()*40;
-  mkMountain(Math.cos(a)*r,Math.sin(a)*r,8+Math.random()*6,8+Math.random()*10);
+  mkMountain(Math.cos(a)*r,Math.sin(a)*r,10+Math.random()*15,15+Math.random()*30);
 }
 
-// РЕКА И МОСТ
+// ==== РЕКА ====
 const riverZ=-90;
 const river=new THREE.Mesh(new THREE.PlaneGeometry(1000,30),new THREE.MeshLambertMaterial({color:0x2a6ea8,transparent:true,opacity:.85}));
 river.rotation.x=-Math.PI/2;river.position.set(0,.05,riverZ);
 scene.add(river);
+
+// ==== МОСТ ====
 const bridgeParts=[];
 (function mkBridge(){
   const g=new THREE.Group();
@@ -118,7 +120,7 @@ const bridgeParts=[];
   g.position.set(0,0,riverZ);scene.add(g);
 })();
 
-// ДОРОГИ — СЕТКА
+// ==== ДОРОГИ ====
 const roadMat=new THREE.MeshLambertMaterial({color:0x1a1a1a});
 const roadPoints=[];
 for(let i=-3;i<=3;i++){
@@ -130,58 +132,46 @@ for(let i=-3;i<=3;i++){
   for(let j=-150;j<=150;j+=10)roadPoints.push({x:i*40,z:j});
 }
 
-// ВОРОНКИ
+// ==== ВОРОНКИ ====
 const craters=[];
 function addCrater(x,z,radius){
-  // воронка — тёмный круг
-  const crater=new THREE.Mesh(
-    new THREE.CircleGeometry(radius*0.5,16),
-    new THREE.MeshBasicMaterial({color:0x1a1008})
-  );
-  crater.rotation.x=-Math.PI/2;crater.position.set(x,.05,z);
-  scene.add(crater);
-  // выброшенная земля по краям — серёжки из цилиндров
+  const crater=new THREE.Mesh(new THREE.CircleGeometry(radius*.5,16),new THREE.MeshBasicMaterial({color:0x1a1008}));
+  crater.rotation.x=-Math.PI/2;crater.position.set(x,.05,z);scene.add(crater);craters.push(crater);
   const cnt=8;
   for(let i=0;i<cnt;i++){
     const a=(i/cnt)*Math.PI*2;
-    const cx=x+Math.cos(a)*radius*0.5;
-    const cz=z+Math.sin(a)*radius*0.5;
-    const chunk=new THREE.Mesh(
-      new THREE.ConeGeometry(1.5+Math.random(),2+Math.random()*2,6),
-      new THREE.MeshLambertMaterial({color:0x4a3a2a,flatShading:true})
-    );
-    chunk.position.set(cx,.5,cz);
-    chunk.rotation.y=Math.random()*Math.PI;
-    scene.add(chunk);
-    craters.push(chunk);
+    const chunk=new THREE.Mesh(new THREE.ConeGeometry(1.5+Math.random(),2+Math.random()*2,6),
+      new THREE.MeshLambertMaterial({color:0x4a3a2a,flatShading:true}));
+    chunk.position.set(x+Math.cos(a)*radius*.5,.5,z+Math.sin(a)*radius*.5);
+    chunk.rotation.y=Math.random()*Math.PI;scene.add(chunk);craters.push(chunk);
   }
-  craters.push(crater);
-  // дым из воронки
   for(let i=0;i<3;i++){
     const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0x555555,transparent:true,opacity:.6}));
-    sm.position.set(x+(Math.random()-.5)*3,1,z+(Math.random()-.5)*3);
-    sm.scale.setScalar(1.5);scene.add(sm);
+    sm.position.set(x+(Math.random()-.5)*3,1,z+(Math.random()-.5)*3);sm.scale.setScalar(1.5);scene.add(sm);
     fx.push({mesh:sm,life:6,max:6,targetR:5,type:'smoke',vel:new THREE.Vector3(0,1,0)});
   }
 }
 function checkCrater(pos,radius){
   for(const p of roadPoints){
-    const dd=Math.hypot(p.x-pos.x,p.z-pos.z);
-    if(dd<radius*0.5){addCrater(pos.x,pos.z,radius);return;}
+    if(Math.hypot(p.x-pos.x,p.z-pos.z)<radius*.5){addCrater(pos.x,pos.z,radius);return;}
   }
 }
 
-// ТЕКСТУРА ОКОН
+// ==== ТЕКСТУРА ОКОН ====
 function windowTexture(w,h,color){
-  const c=document.createElement('canvas');c.width=128;c.height=128;
+  const c=document.createElement('canvas');c.width=256;c.height=256;
   const ctx=c.getContext('2d');
   const cr=(color>>16)&255,cg=(color>>8)&255,cb=color&255;
-  ctx.fillStyle=`rgb(${cr},${cg},${cb})`;ctx.fillRect(0,0,128,128);
-  const cols=4,rows=4,pad=8;
-  const ww=(128-pad*(cols+1))/cols,wh=(128-pad*(rows+1))/rows;
+  ctx.fillStyle=`rgb(${cr},${cg},${cb})`;ctx.fillRect(0,0,256,256);
+  const cols=4,rows=4,pad=12;
+  const ww=(256-pad*(cols+1))/cols,wh=(256-pad*(rows+1))/rows;
   for(let r=0;r<rows;r++)for(let col=0;col<cols;col++){
-    ctx.fillStyle=Math.random()>0.5?'#ffdd88':'#2a3a4a';
-    ctx.fillRect(pad+col*(ww+pad),pad+r*(wh+pad),ww,wh);
+    const lit=Math.random();
+    ctx.fillStyle=lit>.5?'#ffdd88':(lit>.2?'#2a3a4a':'#1a2a3a');
+    const x=pad+col*(ww+pad),y=pad+r*(wh+pad);
+    ctx.fillRect(x,y,ww,wh);
+    // рама окна
+    ctx.strokeStyle='#111';ctx.lineWidth=2;ctx.strokeRect(x,y,ww,wh);
   }
   const tex=new THREE.CanvasTexture(c);
   tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
@@ -189,7 +179,7 @@ function windowTexture(w,h,color){
   return tex;
 }
 
-// ЗДАНИЯ
+// ==== ЗДАНИЯ ====
 const buildings=[],FLOOR_H=4;
 const bColors=[0x8899aa,0xaa9988,0x99aabb,0xbbaa99,0xa0a0a0,0xc0b8a8];
 function mkB(x,z,w,d,f,isSchool,isHospital){
@@ -203,20 +193,58 @@ function mkB(x,z,w,d,f,isSchool,isHospital){
     const m=new THREE.MeshLambertMaterial({map:tex});
     const p=new THREE.Mesh(new THREE.BoxGeometry(w,FLOOR_H,d),m);
     p.position.y=i*FLOOR_H+FLOOR_H/2;p.userData={fi:i};g.add(p);fl.push(p);
+    // балконы на каждом 2-м этаже
+    if(i>0&&i%2===0){
+      const balc=new THREE.Mesh(new THREE.BoxGeometry(w*.6,.2,1),
+        new THREE.MeshLambertMaterial({color:0x666666}));
+      balc.position.set(0,i*FLOOR_H+.1,d/2+.5);g.add(balc);
+      const rail=new THREE.Mesh(new THREE.BoxGeometry(w*.6,.8,.1),
+        new THREE.MeshLambertMaterial({color:0x888888}));
+      rail.position.set(0,i*FLOOR_H+.5,d/2+1);g.add(rail);
+    }
+    // кондиционеры
+    if(Math.random()<.4){
+      const ac=new THREE.Mesh(new THREE.BoxGeometry(.8,.6,.5),
+        new THREE.MeshLambertMaterial({color:0xdddddd}));
+      ac.position.set((Math.random()-.5)*w*.7,i*FLOOR_H+FLOOR_H*.6,d/2+.3);
+      g.add(ac);
+    }
   }
+  // вход на 1 этаже
+  if(f>1){
+    const door=new THREE.Mesh(new THREE.BoxGeometry(2,3,.3),new THREE.MeshLambertMaterial({color:0x333333}));
+    door.position.set(0,1.5,d/2+.16);g.add(door);
+    const canopy=new THREE.Mesh(new THREE.BoxGeometry(4,.3,2),new THREE.MeshLambertMaterial({color:0x555555}));
+    canopy.position.set(0,3.2,d/2+1);g.add(canopy);
+  }
+  // крыша
   const r=new THREE.Mesh(new THREE.BoxGeometry(w*1.05,.5,d*1.05),new THREE.MeshLambertMaterial({color:0x555555}));
   r.position.y=f*FLOOR_H;r.userData={fi:f};g.add(r);fl.push(r);
+  // антенна на крыше
+  if(Math.random()<.6){
+    const ant=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,3,4),new THREE.MeshLambertMaterial({color:0x666666}));
+    ant.position.set(0,f*FLOOR_H+2,0);g.add(ant);
+  }
+  // больница
   if(isHospital){
     const c1=new THREE.Mesh(new THREE.BoxGeometry(w*.5,.3,.8),new THREE.MeshBasicMaterial({color:0xdd2222}));
     c1.position.y=f*FLOOR_H+.5;g.add(c1);
     const c2=new THREE.Mesh(new THREE.BoxGeometry(.8,.3,d*.5),new THREE.MeshBasicMaterial({color:0xdd2222}));
     c2.position.y=f*FLOOR_H+.5;g.add(c2);
   }
+  // школа
   if(isSchool){
     const pole=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,6,6),new THREE.MeshLambertMaterial({color:0x666666}));
     pole.position.set(0,f*FLOOR_H+3,0);g.add(pole);
     const flag=new THREE.Mesh(new THREE.BoxGeometry(2,.3,1.2),new THREE.MeshBasicMaterial({color:0xdd2222}));
     flag.position.set(1.2,f*FLOOR_H+5.5,0);g.add(flag);
+  }
+  // каркас (колонны, торчат после сноса)
+  const columns=[];
+  for(const cx of[-w/2+.3,w/2-.3])for(const cz of[-d/2+.3,d/2-.3]){
+    const col=new THREE.Mesh(new THREE.BoxGeometry(.4,f*FLOOR_H,.4),
+      new THREE.MeshLambertMaterial({color:0x777777}));
+    col.position.set(cx,f*FLOOR_H/2,cz);col.visible=false;g.add(col);
   }
   g.userData={floors:f,floorMeshes:fl,alive:true,width:w,depth:d,destroyed:new Set()};
   scene.add(g);buildings.push(g);
@@ -233,7 +261,7 @@ mkB(90,80,16,14,3,true,false);
 mkB(-120,60,18,16,6,false,true);
 mkB(110,-40,18,16,6,false,true);
 
-// ФОНАРИ
+// ==== ФОНАРИ ====
 const lamps=[],poleMat=new THREE.MeshLambertMaterial({color:0x333333}),lampMat=new THREE.MeshBasicMaterial({color:0xffdd55});
 const poleGeo=new THREE.CylinderGeometry(.3,.3,10,6),headGeo=new THREE.SphereGeometry(.8,8,8);
 function mkLamp(x,z){
@@ -246,7 +274,7 @@ function mkLamp(x,z){
 }
 for(let i=-3;i<=3;i++)for(const z of[15,-15])mkLamp(i*40+15,z);
 
-// МАШИНЫ
+// ==== МАШИНЫ ====
 const cars=[],wheelGeo=new THREE.CylinderGeometry(.4,.4,.3,8),wheelMat=new THREE.MeshLambertMaterial({color:0x111111});
 const glassMat=new THREE.MeshLambertMaterial({color:0x223344}),lightMat=new THREE.MeshBasicMaterial({color:0xffffaa});
 function mkCar(x,z,rot,color){
@@ -276,7 +304,7 @@ for(let i=-3;i<=3;i++)for(let j=0;j<2;j++){
 mkCar(-128,55,0,0xffffff);mkCar(-130,58,0,0xffffff);
 mkCar(102,-40,0,0xffffff);mkCar(104,-43,0,0xffffff);
 
-// АЗС
+// ==== АЗС ====
 const azs=[],tankMat=new THREE.MeshLambertMaterial({color:0xdd3333}),azsMat=new THREE.MeshLambertMaterial({color:0xeeeeee});
 function mkAzs(x,z){
   const g=new THREE.Group();
@@ -297,7 +325,7 @@ function mkAzs(x,z){
 }
 mkAzs(30,60);mkAzs(-80,-30);mkAzs(80,-30);
 
-// АЭРОДРОМ
+// ==== АЭРОДРОМ ====
 const airportZ=-150;
 const runway=new THREE.Mesh(new THREE.PlaneGeometry(160,16),new THREE.MeshLambertMaterial({color:0x333333}));
 runway.rotation.x=-Math.PI/2;runway.position.set(0,.02,airportZ);scene.add(runway);
@@ -312,7 +340,7 @@ towerTop.position.set(25,22,airportZ+14);scene.add(towerTop);
 const hangar=new THREE.Mesh(new THREE.BoxGeometry(22,8,14),new THREE.MeshLambertMaterial({color:0x888888}));
 hangar.position.set(-55,4,airportZ+16);scene.add(hangar);
 
-// САМОЛЁТЫ НА СТОЯНКЕ
+// ==== САМОЛЁТЫ НА СТОЯНКЕ ====
 const parkedPlanes=[];
 function mkParkedPlane(x,z,rot){
   const g=new THREE.Group();
@@ -322,8 +350,6 @@ function mkParkedPlane(x,z,rot){
   nose.rotation.z=-Math.PI/2;nose.position.x=5.5;g.add(nose);
   const wing=new THREE.Mesh(new THREE.BoxGeometry(3,.3,14),new THREE.MeshLambertMaterial({color:0xcccccc}));
   wing.position.x=.5;g.add(wing);
-  const th=new THREE.Mesh(new THREE.BoxGeometry(2,2.5,.3),new THREE.MeshLambertMaterial({color:0xcccccc}));
-  th.position.set(-4,1.3,0);g.add(th);
   g.position.set(x,2.5,z);g.rotation.y=rot;
   g.userData={parked:true,alive:true};
   scene.add(g);parkedPlanes.push(g);
@@ -332,7 +358,7 @@ mkParkedPlane(-55,airportZ-3,0);
 mkParkedPlane(-55,airportZ+6,0);
 mkParkedPlane(-55,airportZ+16,0);
 
-// ВЕТРЯКИ
+// ==== ВЕТРЯКИ ====
 const windmills=[];
 function mkWindmill(x,z){
   const g=new THREE.Group();
@@ -346,35 +372,33 @@ function mkWindmill(x,z){
     const b=new THREE.Mesh(new THREE.BoxGeometry(.6,14,.2),new THREE.MeshLambertMaterial({color:0xf0f0f0}));
     b.position.y=7;blade.add(b);
     blade.rotation.z=(i/3)*Math.PI*2;
-    blade.position.set(0,30,1.3);
-    g.add(blade);blades.push(blade);
+    blade.position.set(0,30,1.3);g.add(blade);blades.push(blade);
   }
   g.position.set(x,0,z);
   g.userData={blades,falling:false,vel:new THREE.Vector3(),rot:new THREE.Vector3()};
   scene.add(g);windmills.push(g);
 }
-mkWindmill(-70,airportZ+30);
-mkWindmill(-30,airportZ+40);
-mkWindmill(30,airportZ+40);
-mkWindmill(70,airportZ+30);
+mkWindmill(-70,airportZ+30);mkWindmill(-30,airportZ+40);
+mkWindmill(30,airportZ+40);mkWindmill(70,airportZ+30);
 
-// ОБЛОМКИ
-const debris=[],MAX_DEB=200;
+// ==== ОБЛОМКИ (куча у основания) ====
+const debris=[],MAX_DEB=250;
 function spawnDebris(pos,mat,size,force){
   if(debris.length>=MAX_DEB){const o=debris.shift();scene.remove(o.mesh);}
+  // обломки падают вниз, скапливаются
   const p=new THREE.Mesh(new THREE.BoxGeometry(size.x*(.5+Math.random()*.4),size.y*(.5+Math.random()*.4),size.z*(.5+Math.random()*.4)),mat);
   p.position.copy(pos);scene.add(p);
   debris.push({
     mesh:p,
     vel:new THREE.Vector3((Math.random()-.5)*force,Math.random()*force*.7+2,(Math.random()-.5)*force),
     rot:new THREE.Vector3((Math.random()-.5)*6,(Math.random()-.5)*6,(Math.random()-.5)*6),
-    life:60
+    life:90,resting:false
   });
 }
 
-// ОБРУШЕНИЕ
+// ==== ОБРУШЕНИЕ ====
 const collapseQ=[];
-function destroyFloor(b,fi,extra){
+function destroyFloor(b,fi){
   const d=b.userData;if(!d.alive)return;
   const top=d.floorMeshes.length-1;
   const start=Math.max(0,Math.min(fi,top));
@@ -393,19 +417,18 @@ function processQ(dt){
     d.destroyed.add(fi);
     const wp=new THREE.Vector3();m.getWorldPosition(wp);
     const bb=new THREE.Box3().setFromObject(m),sz=new THREE.Vector3();bb.getSize(sz);
-    const pc=3+Math.floor(Math.random()*2);
+    const pc=4+Math.floor(Math.random()*3);
     for(let p=0;p<pc;p++){
       const pos=wp.clone();
       pos.x+=(Math.random()-.5)*sz.x*.7;
       pos.y+=(Math.random()-.5)*sz.y*.5;
       pos.z+=(Math.random()-.5)*sz.z*.7;
-      spawnDebris(pos,m.material,new THREE.Vector3(sz.x*.6,sz.y*.6,sz.z*.6),8);
+      spawnDebris(pos,m.material,new THREE.Vector3(sz.x*.5,sz.y*.5,sz.z*.5),8);
     }
     for(let k=0;k<4;k++){
       const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0xaaaaaa,transparent:true,opacity:.5}));
       sm.position.copy(wp);
-      sm.position.x+=(Math.random()-.5)*sz.x;
-      sm.position.z+=(Math.random()-.5)*sz.z;
+      sm.position.x+=(Math.random()-.5)*sz.x;sm.position.z+=(Math.random()-.5)*sz.z;
       sm.scale.setScalar(1.5+Math.random());scene.add(sm);
       fx.push({mesh:sm,life:2.5,max:2.5,targetR:5,type:'smoke',vel:new THREE.Vector3((Math.random()-.5),.5+Math.random()*.5,(Math.random()-.5))});
     }
@@ -414,8 +437,215 @@ function processQ(dt){
   }
 }
 
-// ВЗРЫВЫ
-const fx=[],expGeo=new THREE.SphereGeometry(1,10,10),smokeGeo=new THREE.SphereGeometry(1,6,6);
+// ==== ЭФФЕКТЫ ====
+const fx=[],expGeo=new THREE.SphereGeometry(1,10,10),smokeGeo=new THREE.SphereGeometry(1,6,6),fireGeo=new THREE.SphereGeometry(1,6,6);
+
+// ==== ОГОНЬ ====
+const fires=[];
+function igniteBuilding(b){
+  const d=b.userData;if(!d.alive||d.onFire)return;
+  d.onFire=true;
+  const firePositions=[];
+  for(let i=0;i<d.floorMeshes.length;i++){
+    if(!d.floorMeshes[i].parent)continue;
+    const p=new THREE.Vector3();d.floorMeshes[i].getWorldPosition(p);
+    firePositions.push({pos:p,floor:i});
+    // огонь на этаже
+    const f=new THREE.Mesh(fireGeo,new THREE.MeshBasicMaterial({color:0xff5500,transparent:true,opacity:.9}));
+    f.position.copy(p);f.position.y+=FLOOR_H*.3;f.scale.setScalar(2+Math.random());
+    scene.add(f);
+    fx.push({mesh:f,life:8,max:8,targetR:3,type:'fire'});
+  }
+  fires.push({building:b,time:8+Math.random()*4,positions:firePositions});
+  // через 3 сек перекидываемся на соседнее здание
+  setTimeout(()=>{
+    for(const other of buildings){
+      if(other===b||other.userData.onFire||!other.userData.alive)continue;
+      const dd=Math.hypot(other.position.x-b.position.x,other.position.z-b.position.z);
+      if(dd<30&&Math.random()<.5)igniteBuilding(other);
+    }
+  },3000);
+  // этажи постепенно сгорают
+  let idx=0;
+  const burnInt=setInterval(()=>{
+    if(idx>=firePositions.length){clearInterval(burnInt);return;}
+    const fp=firePositions[idx];
+    if(!d.destroyed.has(fp.floor)){
+      collapseQ.push({b,fi:fp.floor,time:0});
+    }
+    idx++;
+  },1000);
+}
+function updateFires(dt){
+  for(let i=fires.length-1;i>=0;i--){
+    const f=fires[i];f.time-=dt;
+    if(f.time<=0){fires.splice(i,1);}
+  }
+}
+
+// ==== МОЛНИЯ ====
+function strikeLightning(pos){
+  // линия с неба
+  const points=[new THREE.Vector3(pos.x,300,pos.z),new THREE.Vector3(pos.x,pos.y,pos.z)];
+  const geo=new THREE.BufferGeometry().setFromPoints(points);
+  const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xaaccff,linewidth:3}));
+  scene.add(line);
+  setTimeout(()=>scene.remove(line),200);
+  // вспышка
+  const fl=document.getElementById('flash');
+  fl.style.transition='none';fl.style.opacity='1';
+  setTimeout(()=>{fl.style.transition='opacity .3s';fl.style.opacity='0';},50);
+  explode(pos,15,20,false);
+}
+
+// ==== КЛАСТЕРНАЯ БОМБА ====
+function dropCluster(pos){
+  explode(pos,18,20,false);
+  for(let i=0;i<8;i++){
+    const a=Math.random()*Math.PI*2,r=8+Math.random()*12;
+    const p=new THREE.Vector3(pos.x+Math.cos(a)*r,pos.y+Math.random()*5,pos.z+Math.sin(a)*r);
+    setTimeout(()=>explode(p,10,12,false),100+i*80);
+  }
+}
+
+// ==== ВЕРТОЛЁТ ====
+const helis=[];
+function spawnHeli(){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.BoxGeometry(6,2.5,2.5),new THREE.MeshLambertMaterial({color:0x556644}));
+  g.add(body);
+  const tail=new THREE.Mesh(new THREE.BoxGeometry(4,.5,.5),new THREE.MeshLambertMaterial({color:0x556644}));
+  tail.position.set(-4.5,.8,0);g.add(tail);
+  const rotor=new THREE.Mesh(new THREE.BoxGeometry(.3,.1,10),new THREE.MeshLambertMaterial({color:0x333333}));
+  rotor.position.y=2;g.add(rotor);
+  const tailRotor=new THREE.Mesh(new THREE.BoxGeometry(.2,1.5,.1),new THREE.MeshLambertMaterial({color:0x333333}));
+  tailRotor.position.set(-6.5,1,0);g.add(tailRotor);
+  g.position.set(Math.random()*100-50,50,Math.random()*100-50);
+  scene.add(g);
+  helis.push({mesh:g,rotor,fireCd:0,target:null,life:30});
+}
+function updateHelis(dt){
+  for(let i=helis.length-1;i>=0;i--){
+    const h=helis[i];h.life-=dt;h.rotor.rotation.y+=15*dt;
+    // выбрать цель
+    if(!h.target||!h.target.userData.alive){
+      const alive=buildings.filter(b=>b.userData.alive);
+      if(alive.length)h.target=alive[Math.floor(Math.random()*alive.length)];
+    }
+    if(h.target){
+      const tp=new THREE.Vector3(h.target.position.x,40,h.target.position.z);
+      const dir=tp.clone().sub(h.mesh.position);
+      if(dir.length()>2)h.mesh.position.addScaledVector(dir.normalize(),15*dt);
+      // стрелять
+      h.fireCd-=dt;
+      if(h.fireCd<=0){
+        h.fireCd=1.2;
+        const from=h.mesh.position.clone();
+        const to=new THREE.Vector3(h.target.position.x,(Math.random()*.6+.5)*h.target.userData.floors*FLOOR_H,h.target.position.z);
+        launchRocket(from,to);
+      }
+    }
+    if(h.life<=0){scene.remove(h.mesh);helis.splice(i,1);}
+  }
+}
+
+// ==== ТОРНАДО ====
+let tornado=null;
+function spawnTornado(){
+  if(tornado){scene.remove(tornado.mesh);}
+  const g=new THREE.Group();
+  for(let i=0;i<10;i++){
+    const r=1+i*.8;
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.8,6,12),new THREE.MeshLambertMaterial({color:0x888899,transparent:true,opacity:.5}));
+    ring.rotation.x=Math.PI/2;ring.position.y=i*2.5;g.add(ring);
+  }
+  g.position.set(Math.random()*100-50,0,Math.random()*100-50);
+  scene.add(g);
+  tornado={mesh:g,life:20,dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize()};
+}
+function updateTornado(dt){
+  if(!tornado)return;
+  tornado.life-=dt;
+  tornado.mesh.position.addScaledVector(tornado.dir,8*dt);
+  tornado.mesh.rotation.y+=5*dt;
+  // втягивает машины и фонари
+  const tp=tornado.mesh.position;
+  for(const car of cars){
+    if(car.userData.exploded)continue;
+    const dx=tp.x-car.position.x,dz=tp.z-car.position.z;
+    const dd=Math.hypot(dx,dz);
+    if(dd<15){
+      car.userData.vel=car.userData.vel||new THREE.Vector3();
+      car.userData.vel.x-=dx*0.3;car.userData.vel.z-=dz*0.3;car.userData.vel.y+=10;
+    }
+  }
+  for(const lamp of lamps){
+    if(lamp.userData.falling)continue;
+    const dx=tp.x-lamp.position.x,dz=tp.z-lamp.position.z;
+    if(Math.hypot(dx,dz)<12){
+      lamp.userData.falling=true;
+      lamp.userData.vel.set(-dx*.5,5,-dz*.5);
+      lamp.userData.rot.set((Math.random()-.5)*5,(Math.random()-.5)*5,(Math.random()-.5)*5);
+    }
+  }
+  if(tornado.life<=0){scene.remove(tornado.mesh);tornado=null;}
+}
+
+// ==== ЦУНАМИ ====
+let tsunami=null;
+function spawnTsunami(){
+  if(tsunami){scene.remove(tsunami.mesh);}
+  const w=new THREE.Mesh(new THREE.BoxGeometry(400,10,20),new THREE.MeshLambertMaterial({color:0x3a7ea8,transparent:true,opacity:.85}));
+  w.position.set(0,5,riverZ);
+  scene.add(w);
+  tsunami={mesh:w,life:15};
+}
+function updateTsunami(dt){
+  if(!tsunami)return;
+  tsunami.life-=dt;
+  // волна движется на север
+  tsunami.mesh.position.z+=15*dt;
+  const wp=tsunami.mesh.position;
+  // смывает объекты в полосе
+  for(const car of cars){
+    if(car.userData.exploded)continue;
+    if(Math.abs(car.position.z-wp.z)<20&&Math.abs(car.position.x-wp.x)<200){
+      car.userData.vel=car.userData.vel||new THREE.Vector3();
+      car.userData.vel.z+=15;car.userData.vel.y+=5;
+    }
+  }
+  for(const b of buildings){
+    if(!b.userData.alive)continue;
+    if(Math.abs(b.position.z-wp.z)<15&&Math.abs(b.position.x-wp.x)<200){
+      // нижние 2 этажа
+      destroyFloor(b,0);
+    }
+  }
+  if(tsunami.life<=0){scene.remove(tsunami.mesh);tsunami=null;}
+}
+
+// ==== ЗЕМЛЕТРЯСЕНИЕ ====
+let quake=null;
+function spawnQuake(){
+  quake={life:8,shake:0};
+}
+function updateQuake(dt){
+  if(!quake)return;
+  quake.life-=dt;
+  quake.shake=Math.sin(Date.now()*.05)*.5;
+  // случайные обвалы
+  if(Math.random()<.15){
+    const alive=buildings.filter(b=>b.userData.alive);
+    if(alive.length){
+      const b=alive[Math.floor(Math.random()*alive.length)];
+      const fi=Math.floor(Math.random()*b.userData.floors);
+      collapseQ.push({b,fi,time:0});
+    }
+  }
+  if(quake.life<=0)quake=null;
+}
+
+// ==== ВЗРЫВЫ ====
 function explode(pos,radius,power,isNuke){
   const fireColor=isNuke?0xffffee:0xffaa33;
   const m=new THREE.MeshBasicMaterial({color:fireColor,transparent:true,opacity:.95});
@@ -443,7 +673,6 @@ function explode(pos,radius,power,isNuke){
   const light=new THREE.PointLight(fireColor,isNuke?800:300,radius*6);
   light.position.copy(pos);scene.add(light);
   fx.push({light,life:isNuke?.8:.35,max:isNuke?.8:.35});
-  // воронка на дороге
   checkCrater(pos,radius);
   for(const b of buildings){
     const d=b.userData;if(!d.alive)continue;
@@ -468,8 +697,7 @@ function explode(pos,radius,power,isNuke){
   for(const part of bridgeParts){
     if(!part.parent)continue;
     const wp=new THREE.Vector3();part.getWorldPosition(wp);
-    const dd=Math.hypot(wp.x-pos.x,wp.z-pos.z);
-    if(dd<radius+5){
+    if(Math.hypot(wp.x-pos.x,wp.z-pos.z)<radius+5){
       for(let p=0;p<8;p++)spawnDebris(wp,part.material,new THREE.Vector3(10,.8,4.5),18);
       part.parent.remove(part);
     }
@@ -535,9 +763,16 @@ function explode(pos,radius,power,isNuke){
       }
     }
   }
+  // поджигаем близкие здания при ядерном или большом взрыве
+  if(isNuke||radius>25){
+    for(const b of buildings){
+      const dd=Math.hypot(b.position.x-pos.x,b.position.z-pos.z);
+      if(dd<radius*0.7&&Math.random()<.6)igniteBuilding(b);
+    }
+  }
 }
 
-// РАКЕТЫ
+// ==== РАКЕТЫ ====
 const rockets=[];
 function launchRocket(from,to){
   const g=new THREE.Group();
@@ -550,7 +785,7 @@ function launchRocket(from,to){
   rockets.push({mesh:g,vel:dir.multiplyScalar(70),life:3});
 }
 
-// САМОЛЁТ ИГРОКА
+// ==== САМОЛЁТ ИГРОКА ====
 let playerPlane=null;
 const planeBodyGeo=new THREE.CylinderGeometry(.9,.9,9,12),planeMat=new THREE.MeshLambertMaterial({color:0xdddddd});
 const wingMat=new THREE.MeshLambertMaterial({color:0xcccccc}),engMat=new THREE.MeshLambertMaterial({color:0x333333});
@@ -569,13 +804,12 @@ function mkPlane(){
 }
 function launchPlane(){
   const g=mkPlane();
-  g.position.set(-75,2.5,airportZ);
-  g.rotation.y=Math.PI;
+  g.position.set(-75,2.5,airportZ);g.rotation.y=Math.PI;
   scene.add(g);
   playerPlane={mesh:g,speed:0,maxSpeed:60,flying:false};
   document.getElementById('pControls').classList.add('on');
   document.getElementById('exit').classList.add('on');
-  document.getElementById('hud').style.opacity='.4';
+  document.getElementById('hudWrap').style.opacity='.4';
   controls.enabled=false;
 }
 function updatePlane(dt){
@@ -614,24 +848,16 @@ function updatePlane(dt){
         const fm=new THREE.MeshBasicMaterial({color:0xffaa33,transparent:true,opacity:.95});
         const fs=new THREE.Mesh(expGeo,fm);fs.position.copy(hp);scene.add(fs);
         fx.push({mesh:fs,life:.6,max:.6,targetR:16,type:'fireball'});
-        for(let k=0;k<4;k++){
-          const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:.7}));
-          sm.position.copy(hp);sm.position.x+=(Math.random()-.5)*3;sm.position.y+=(Math.random()-.5)*3;sm.position.z+=(Math.random()-.5)*3;
-          sm.scale.setScalar(2);scene.add(sm);
-          fx.push({mesh:sm,life:3,max:3,targetR:6,type:'smoke',vel:new THREE.Vector3((Math.random()-.5),1.5,(Math.random()-.5))});
-        }
-        // ИСПРАВЛЕНО: ломаем hitFloor + ВСЁ выше
-        const data=b.userData;
-        const top=b.userData.floors-1;
+        const data=b.userData;const top=b.userData.floors-1;
         for(let fi=top;fi>=hf;fi--){
           if(data.destroyed.has(fi))continue;
           collapseQ.push({b,fi,time:(top-fi)*.1});
         }
+        igniteBuilding(b);
         scene.remove(p.mesh);playerPlane=null;endPlane();return;
       }
     }
   }
-  // столкновение с ветряком
   for(const w of windmills){
     if(w.userData.falling)continue;
     const dd=Math.hypot(p.mesh.position.x-w.position.x,p.mesh.position.z-w.position.z);
@@ -643,10 +869,7 @@ function updatePlane(dt){
       for(const bl of w.userData.blades){
         const wp=new THREE.Vector3();bl.getWorldPosition(wp);
         const bm=bl.children[0];
-        if(bm){
-          for(let k=0;k<4;k++)spawnDebris(wp,bm.material,new THREE.Vector3(1,4,.3),20);
-          bl.remove(bm);
-        }
+        if(bm){for(let k=0;k<4;k++)spawnDebris(wp,bm.material,new THREE.Vector3(1,4,.3),20);bl.remove(bm);}
       }
       const hp=p.mesh.position.clone();
       const pm=[planeMat,wingMat,engMat];
@@ -667,7 +890,7 @@ function endPlane(){
   camera.position.set(50,60,100);
   document.getElementById('pControls').classList.remove('on');
   document.getElementById('exit').classList.remove('on');
-  document.getElementById('hud').style.opacity='1';
+  document.getElementById('hudWrap').style.opacity='1';
 }
 const planeInput={left:false,right:false,up:false,down:false};
 function bindH(id,k){
@@ -681,7 +904,7 @@ document.getElementById('exit').addEventListener('click',()=>{
   endPlane();
 });
 
-// КАМЕРА
+// ==== КАМЕРА ====
 let camTheta=Math.PI/4,camPhi=Math.PI/3,camDist=140;
 const camTarget=new THREE.Vector3(0,5,0);
 const controls={enabled:true,update(){
@@ -692,6 +915,11 @@ const controls={enabled:true,update(){
   camera.position.y=camTarget.y+camDist*Math.cos(camPhi);
   camera.position.z=camTarget.z+camDist*Math.sin(camPhi)*Math.sin(camTheta);
   camera.lookAt(camTarget);
+  // землетрясение трясёт камеру
+  if(quake){
+    camera.position.x+=quake.shake*3;
+    camera.position.y+=quake.shake*2;
+  }
 }};
 let touchStart=null,pinchStart=0;
 renderer.domElement.addEventListener('touchstart',e=>{
@@ -717,12 +945,41 @@ renderer.domElement.addEventListener('touchend',e=>{
   touchStart=null;pinchStart=0;
 },{passive:true});
 
+// ==== HUD — 2 РЯДА КНОПОК ====
+let page=1;
+document.getElementById('pageDots').addEventListener('click',()=>togglePage());
+function togglePage(){
+  page=page===1?2:1;
+  const w=document.getElementById('hudWrap');
+  const r1=document.getElementById('hudRow1');
+  const r2=document.getElementById('hudRow2');
+  const dots=document.querySelectorAll('.dot');
+  if(page===1){r1.style.display='flex';r2.style.display='none';dots[0].classList.add('on');dots[1].classList.remove('on');}
+  else{r1.style.display='none';r2.style.display='flex';dots[0].classList.remove('on');dots[1].classList.add('on');}
+}
+// свайп по панели кнопок
+let hudTouchX=null;
+document.getElementById('hudWrap').addEventListener('touchstart',e=>{
+  if(e.touches.length===1)hudTouchX=e.touches[0].clientX;
+},{passive:true});
+document.getElementById('hudWrap').addEventListener('touchend',e=>{
+  if(hudTouchX!==null){
+    const dx=(e.changedTouches[0].clientX-hudTouchX);
+    if(Math.abs(dx)>50)togglePage();
+    hudTouchX=null;
+  }
+},{passive:true});
+
 let mode='bomb';
-document.querySelectorAll('#hud .btn').forEach(b=>{
+document.querySelectorAll('.btn').forEach(b=>{
   b.addEventListener('click',()=>{
-    document.querySelectorAll('#hud .btn').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.btn').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');mode=b.dataset.mode;
     if(mode==='plane')launchPlane();
+    if(mode==='heli')spawnHeli();
+    if(mode==='tornado')spawnTornado();
+    if(mode==='tsunami')spawnTsunami();
+    if(mode==='quake')spawnQuake();
   });
 });
 
@@ -744,14 +1001,31 @@ function handleTap(x,y){
   else if(mode==='grenade')explode(p,9,10,false);
   else if(mode==='rocket')launchRocket(camera.position.clone(),p);
   else if(mode==='nuke')explode(p,60,60,true);
+  else if(mode==='fire'){
+    // найти ближайшее здание и поджечь
+    let best=null,bd=999;
+    for(const b of buildings){
+      if(!b.userData.alive)continue;
+      const dd=Math.hypot(b.position.x-p.x,b.position.z-p.z);
+      if(dd<bd){bd=dd;best=b;}
+    }
+    if(best&&bd<40)igniteBuilding(best);
+  }
+  else if(mode==='lightning')strikeLightning(p);
+  else if(mode==='cluster')dropCluster(p);
 }
 
-// ЦИКЛ
+// ==== ЦИКЛ ====
 const cl=new THREE.Clock();
 function loop(){
   requestAnimationFrame(loop);
   const dt=Math.min(cl.getDelta(),.05);
   processQ(dt);
+  updateFires(dt);
+  updateHelis(dt);
+  updateTornado(dt);
+  updateTsunami(dt);
+  updateQuake(dt);
   for(let i=debris.length-1;i>=0;i--){
     const d=debris[i];d.vel.y-=22*dt;d.mesh.position.addScaledVector(d.vel,dt);
     if(d.mesh.position.y<.3){d.mesh.position.y=.3;d.vel.y*=-.25;d.vel.x*=.7;d.vel.z*=.7;}
@@ -764,6 +1038,7 @@ function loop(){
     const e=fx[i];e.life-=dt;const k=Math.max(0,e.life/e.max);
     if(e.mesh){
       if(e.type==='stem'){e.mesh.material.opacity=.7*k;}
+      else if(e.type==='fire'){e.mesh.scale.setScalar(2+Math.sin(Date.now()*.01)*.5);e.mesh.material.opacity=k;}
       else{
         const s=e.targetR*(1-k*k);e.mesh.scale.setScalar(Math.max(.1,s));
         e.mesh.material.opacity=k*(e.type==='smoke'?.6:1);
