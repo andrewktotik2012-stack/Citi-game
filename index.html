@@ -41,8 +41,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:
 <script>
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x87ceeb);
-scene.fog=new THREE.Fog(0x87ceeb,120,500);
-const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,1500);
+scene.fog=new THREE.Fog(0x87ceeb,150,600);
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,2000);
 camera.position.set(50,60,100);
 const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.3));
@@ -53,9 +53,47 @@ const sun=new THREE.DirectionalLight(0xffffff,1.3);
 sun.position.set(80,150,60);
 scene.add(sun);
 
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(1000,1000),new THREE.MeshLambertMaterial({color:0x3a5a3a}));
+// ЗЕМЛЯ
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(1200,1200),new THREE.MeshLambertMaterial({color:0x3a5a3a}));
 ground.rotation.x=-Math.PI/2;
 scene.add(ground);
+
+// ГОРЫ ВОКРУГ ГОРОДА
+const mountains=[];
+function mkMountain(x,z,r,h){
+  const cone=new THREE.Mesh(
+    new THREE.ConeGeometry(r,h,8),
+    new THREE.MeshLambertMaterial({color:0x667755,flatShading:true})
+  );
+  cone.position.set(x,h/2,z);
+  cone.rotation.y=Math.random()*Math.PI;
+  scene.add(cone);mountains.push(cone);
+  // снежная шапка
+  if(h>25){
+    const cap=new THREE.Mesh(
+      new THREE.ConeGeometry(r*0.4,h*0.3,8),
+      new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true})
+    );
+    cap.position.set(x,h*0.85,z);
+    cap.rotation.y=cone.rotation.y;
+    scene.add(cap);
+  }
+}
+// кольцо гор по краям карты (радиус 250-400)
+for(let a=0;a<Math.PI*2;a+=Math.PI/16){
+  const r=250+Math.random()*130;
+  const x=Math.cos(a)*r;
+  const z=Math.sin(a)*r;
+  const h=15+Math.random()*30;
+  const rr=10+Math.random()*15;
+  mkMountain(x,z,rr,h);
+}
+// пара холмов ближе к городу
+for(let i=0;i<8;i++){
+  const a=Math.random()*Math.PI*2;
+  const r=180+Math.random()*40;
+  mkMountain(Math.cos(a)*r,Math.sin(a)*r,8+Math.random()*6,8+Math.random()*10);
+}
 
 // РЕКА И МОСТ
 const riverZ=-90;
@@ -80,27 +118,56 @@ const bridgeParts=[];
   g.position.set(0,0,riverZ);scene.add(g);
 })();
 
-// ДОРОГИ — СЕТКА (как было)
+// ДОРОГИ — СЕТКА
 const roadMat=new THREE.MeshLambertMaterial({color:0x1a1a1a});
 const roadPoints=[];
 for(let i=-3;i<=3;i++){
   const h=new THREE.Mesh(new THREE.PlaneGeometry(300,8),roadMat);
   h.rotation.x=-Math.PI/2;h.position.set(0,.01,i*40);scene.add(h);
-  for(let j=-150;j<=150;j+=10)roadPoints.push({x:j,z:i*40,r:8});
+  for(let j=-150;j<=150;j+=10)roadPoints.push({x:j,z:i*40});
   const v=new THREE.Mesh(new THREE.PlaneGeometry(8,300),roadMat);
   v.rotation.x=-Math.PI/2;v.position.set(i*40,.01,0);scene.add(v);
-  for(let j=-150;j<=150;j+=10)roadPoints.push({x:i*40,z:j,r:8});
+  for(let j=-150;j<=150;j+=10)roadPoints.push({x:i*40,z:j});
 }
-const pits=[];
-function addPit(x,z){
-  const pit=new THREE.Mesh(new THREE.CircleGeometry(3+Math.random()*2,12),new THREE.MeshBasicMaterial({color:0x000000}));
-  pit.rotation.x=-Math.PI/2;pit.position.set(x,.06,z);
-  scene.add(pit);pits.push(pit);
+
+// ВОРОНКИ
+const craters=[];
+function addCrater(x,z,radius){
+  // воронка — тёмный круг
+  const crater=new THREE.Mesh(
+    new THREE.CircleGeometry(radius*0.5,16),
+    new THREE.MeshBasicMaterial({color:0x1a1008})
+  );
+  crater.rotation.x=-Math.PI/2;crater.position.set(x,.05,z);
+  scene.add(crater);
+  // выброшенная земля по краям — серёжки из цилиндров
+  const cnt=8;
+  for(let i=0;i<cnt;i++){
+    const a=(i/cnt)*Math.PI*2;
+    const cx=x+Math.cos(a)*radius*0.5;
+    const cz=z+Math.sin(a)*radius*0.5;
+    const chunk=new THREE.Mesh(
+      new THREE.ConeGeometry(1.5+Math.random(),2+Math.random()*2,6),
+      new THREE.MeshLambertMaterial({color:0x4a3a2a,flatShading:true})
+    );
+    chunk.position.set(cx,.5,cz);
+    chunk.rotation.y=Math.random()*Math.PI;
+    scene.add(chunk);
+    craters.push(chunk);
+  }
+  craters.push(crater);
+  // дым из воронки
+  for(let i=0;i<3;i++){
+    const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0x555555,transparent:true,opacity:.6}));
+    sm.position.set(x+(Math.random()-.5)*3,1,z+(Math.random()-.5)*3);
+    sm.scale.setScalar(1.5);scene.add(sm);
+    fx.push({mesh:sm,life:6,max:6,targetR:5,type:'smoke',vel:new THREE.Vector3(0,1,0)});
+  }
 }
-function checkPit(pos,radius){
+function checkCrater(pos,radius){
   for(const p of roadPoints){
     const dd=Math.hypot(p.x-pos.x,p.z-pos.z);
-    if(dd<radius*0.5){addPit(pos.x,pos.z);return;}
+    if(dd<radius*0.5){addCrater(pos.x,pos.z,radius);return;}
   }
 }
 
@@ -137,17 +204,14 @@ function mkB(x,z,w,d,f,isSchool,isHospital){
     const p=new THREE.Mesh(new THREE.BoxGeometry(w,FLOOR_H,d),m);
     p.position.y=i*FLOOR_H+FLOOR_H/2;p.userData={fi:i};g.add(p);fl.push(p);
   }
-  // крыша
   const r=new THREE.Mesh(new THREE.BoxGeometry(w*1.05,.5,d*1.05),new THREE.MeshLambertMaterial({color:0x555555}));
   r.position.y=f*FLOOR_H;r.userData={fi:f};g.add(r);fl.push(r);
-  // больница — красный крест на крыше
   if(isHospital){
-    const cross1=new THREE.Mesh(new THREE.BoxGeometry(w*.5,.3,.8),new THREE.MeshBasicMaterial({color:0xdd2222}));
-    cross1.position.y=f*FLOOR_H+.5;g.add(cross1);
-    const cross2=new THREE.Mesh(new THREE.BoxGeometry(.8,.3,d*.5),new THREE.MeshBasicMaterial({color:0xdd2222}));
-    cross2.position.y=f*FLOOR_H+.5;g.add(cross2);
+    const c1=new THREE.Mesh(new THREE.BoxGeometry(w*.5,.3,.8),new THREE.MeshBasicMaterial({color:0xdd2222}));
+    c1.position.y=f*FLOOR_H+.5;g.add(c1);
+    const c2=new THREE.Mesh(new THREE.BoxGeometry(.8,.3,d*.5),new THREE.MeshBasicMaterial({color:0xdd2222}));
+    c2.position.y=f*FLOOR_H+.5;g.add(c2);
   }
-  // школа — флаг
   if(isSchool){
     const pole=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,6,6),new THREE.MeshLambertMaterial({color:0x666666}));
     pole.position.set(0,f*FLOOR_H+3,0);g.add(pole);
@@ -157,7 +221,6 @@ function mkB(x,z,w,d,f,isSchool,isHospital){
   g.userData={floors:f,floorMeshes:fl,alive:true,width:w,depth:d,destroyed:new Set()};
   scene.add(g);buildings.push(g);
 }
-// обычные
 for(let gx=-3;gx<=3;gx++)for(let gz=-3;gz<=3;gz++){
   if(!gx&&!gz)continue;
   const cx=gx*40,cz=gz*40;
@@ -165,10 +228,8 @@ for(let gx=-3;gx<=3;gx++)for(let gz=-3;gz<=3;gz++){
   for(let i=0;i<2;i++)mkB(cx+(Math.random()-.5)*18,cz+(Math.random()-.5)*18,8+Math.random()*5,8+Math.random()*5,3+Math.floor(Math.random()*8));
   if(Math.random()<.3)mkB(cx+(Math.random()-.5)*18,cz+(Math.random()-.5)*18,10,10,12+Math.floor(Math.random()*8));
 }
-// ШКОЛА
 mkB(-100,-60,16,14,3,true,false);
 mkB(90,80,16,14,3,true,false);
-// БОЛЬНИЦА
 mkB(-120,60,18,16,6,false,true);
 mkB(110,-40,18,16,6,false,true);
 
@@ -212,7 +273,6 @@ for(let i=-3;i<=3;i++)for(let j=0;j<2;j++){
   if(Math.abs(z-riverZ)<22)continue;
   mkCar(x,z,along?0:Math.PI/2);
 }
-// скорые у больниц
 mkCar(-128,55,0,0xffffff);mkCar(-130,58,0,0xffffff);
 mkCar(102,-40,0,0xffffff);mkCar(104,-43,0,0xffffff);
 
@@ -252,7 +312,7 @@ towerTop.position.set(25,22,airportZ+14);scene.add(towerTop);
 const hangar=new THREE.Mesh(new THREE.BoxGeometry(22,8,14),new THREE.MeshLambertMaterial({color:0x888888}));
 hangar.position.set(-55,4,airportZ+16);scene.add(hangar);
 
-// САМОЛЁТЫ НА СТОЯНКЕ (разрушаемые)
+// САМОЛЁТЫ НА СТОЯНКЕ
 const parkedPlanes=[];
 function mkParkedPlane(x,z,rot){
   const g=new THREE.Group();
@@ -312,13 +372,12 @@ function spawnDebris(pos,mat,size,force){
   });
 }
 
-// ОБРУШЕНИЕ — теперь падают ВСЕ этажи выше точки удара
+// ОБРУШЕНИЕ
 const collapseQ=[];
 function destroyFloor(b,fi,extra){
   const d=b.userData;if(!d.alive)return;
   const top=d.floorMeshes.length-1;
   const start=Math.max(0,Math.min(fi,top));
-  // ВСЁ выше start — падает каскадом (сверху вниз)
   for(let i=top;i>=start;i--){
     if(d.destroyed.has(i))continue;
     collapseQ.push({b,fi:i,time:(top-i)*.1});
@@ -384,7 +443,8 @@ function explode(pos,radius,power,isNuke){
   const light=new THREE.PointLight(fireColor,isNuke?800:300,radius*6);
   light.position.copy(pos);scene.add(light);
   fx.push({light,life:isNuke?.8:.35,max:isNuke?.8:.35});
-  checkPit(pos,radius);
+  // воронка на дороге
+  checkCrater(pos,radius);
   for(const b of buildings){
     const d=b.userData;if(!d.alive)continue;
     const dd=Math.hypot(b.position.x-pos.x,b.position.z-pos.z);
@@ -393,13 +453,11 @@ function explode(pos,radius,power,isNuke){
     hf=Math.max(0,Math.min(hf,d.floors-1));
     destroyFloor(b,hf);
   }
-  // самолёты на стоянке
   for(const pp of parkedPlanes){
     if(!pp.userData.alive)continue;
     const dd=Math.hypot(pp.position.x-pos.x,pp.position.z-pos.z);
     if(dd<radius+5){
       pp.userData.alive=false;
-      const wp=pp.position.clone();
       for(const child of [...pp.children]){
         const cwp=new THREE.Vector3();child.getWorldPosition(cwp);
         for(let k=0;k<3;k++)spawnDebris(cwp,child.material||new THREE.MeshLambertMaterial({color:0xaaaaaa}),new THREE.Vector3(1,1,1),15);
@@ -543,7 +601,6 @@ function updatePlane(dt){
     fx.push({mesh:sm,life:1.2,max:1.2,targetR:3,type:'smoke',vel:new THREE.Vector3(0,.5,0)});
   }
   if(p.mesh.position.y<1){explode(p.mesh.position.clone(),25,35,false);scene.remove(p.mesh);playerPlane=null;endPlane();return;}
-  // столкновение со зданиями — ломает мало
   for(const b of buildings){
     if(!b.userData.alive)continue;
     const dx=p.mesh.position.x-b.position.x,dz=p.mesh.position.z-b.position.z;
@@ -563,22 +620,22 @@ function updatePlane(dt){
           sm.scale.setScalar(2);scene.add(sm);
           fx.push({mesh:sm,life:3,max:3,targetR:6,type:'smoke',vel:new THREE.Vector3((Math.random()-.5),1.5,(Math.random()-.5))});
         }
-        // ломаем hitFloor + 1 выше
+        // ИСПРАВЛЕНО: ломаем hitFloor + ВСЁ выше
         const data=b.userData;
-        for(let fi=Math.min(b.userData.floors-1,hf+1);fi>=hf;fi--){
+        const top=b.userData.floors-1;
+        for(let fi=top;fi>=hf;fi--){
           if(data.destroyed.has(fi))continue;
-          collapseQ.push({b,fi,time:(Math.min(b.userData.floors-1,hf+1)-fi)*.15});
+          collapseQ.push({b,fi,time:(top-fi)*.1});
         }
         scene.remove(p.mesh);playerPlane=null;endPlane();return;
       }
     }
   }
-  // СТОЛКНОВЕНИЕ С ВЕТРЯКОМ
+  // столкновение с ветряком
   for(const w of windmills){
     if(w.userData.falling)continue;
     const dd=Math.hypot(p.mesh.position.x-w.position.x,p.mesh.position.z-w.position.z);
     if(dd<5&&p.mesh.position.y>15&&p.mesh.position.y<35){
-      // ломаем ветряк
       w.userData.falling=true;
       const dx=w.position.x-p.mesh.position.x,dz=w.position.z-p.mesh.position.z,dist=Math.hypot(dx,dz)||1;
       w.userData.vel.set(dx/dist*15,5,dz/dist*15);
@@ -591,7 +648,6 @@ function updatePlane(dt){
           bl.remove(bm);
         }
       }
-      // взрыв самолёта
       const hp=p.mesh.position.clone();
       const pm=[planeMat,wingMat,engMat];
       for(let k=0;k<16;k++)spawnDebris(hp,pm[k%3],new THREE.Vector3(1.2,1,1.2),28);
@@ -601,7 +657,6 @@ function updatePlane(dt){
       scene.remove(p.mesh);playerPlane=null;endPlane();return;
     }
   }
-  // камера сзади
   const fwd=new THREE.Vector3(1,0,0).applyEuler(p.mesh.rotation);
   const camOffset=fwd.clone().multiplyScalar(-22);camOffset.y+=8;
   camera.position.copy(p.mesh.position).add(camOffset);
