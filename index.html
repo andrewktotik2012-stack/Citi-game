@@ -2,584 +2,413 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>City Destruction Mobile</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>City Destruction</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { width:100%; height:100%; overflow:hidden; background:#87ceeb; font-family:Arial; touch-action:none; }
-  #app { position:fixed; inset:0; }
-  #info {
-    position:fixed; top:8px; left:8px; color:#fff; z-index:10;
-    background:rgba(0,0,0,0.55); padding:6px 10px; border-radius:6px;
-    font-size:12px; line-height:1.4;
-  }
-  #info b { color:#ffd700; }
-  #hud {
-    position:fixed; bottom:0; left:0; right:0; z-index:10;
-    display:flex; justify-content:center; gap:10px;
-    padding:10px 10px calc(10px + env(safe-area-inset-bottom));
-    background:linear-gradient(to top, rgba(0,0,0,0.6), transparent);
-  }
-  .btn {
-    width:72px; height:72px; border-radius:50%;
-    background:rgba(255,255,255,0.15);
-    border:2px solid rgba(255,255,255,0.4);
-    color:#fff; font-size:30px; line-height:1;
-    display:flex; align-items:center; justify-content:center;
-    user-select:none; -webkit-user-select:none;
-    backdrop-filter: blur(4px);
-    transition: transform 0.1s, background 0.1s;
-  }
-  .btn:active, .btn.active {
-    transform: scale(0.92);
-    background: rgba(255,80,80,0.5);
-    border-color:#ff6666;
-  }
-  #crosshair {
-    position:fixed; top:50%; left:50%; width:24px; height:24px;
-    margin:-12px 0 0 -12px; z-index:5; pointer-events:none;
-  }
-  #crosshair::before, #crosshair::after {
-    content:''; position:absolute; background:rgba(255,255,255,0.85);
-    box-shadow:0 0 3px rgba(0,0,0,0.8);
-  }
-  #crosshair::before { left:11px; top:0; width:2px; height:24px; }
-  #crosshair::after  { top:11px; left:0; height:2px; width:24px; }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:Arial;touch-action:none}
+#info{position:fixed;top:6px;left:6px;color:#fff;z-index:10;background:rgba(0,0,0,.55);padding:5px 9px;border-radius:6px;font-size:11px;line-height:1.4}
+#hud{position:fixed;bottom:0;left:0;right:0;z-index:10;display:flex;justify-content:center;gap:8px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:linear-gradient(to top,rgba(0,0,0,.6),transparent)}
+.btn{width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.4);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;user-select:none;backdrop-filter:blur(4px);transition:transform .1s,background .1s}
+.btn.active{transform:scale(.92);background:rgba(255,80,80,.5);border-color:#f66}
+#pControls{position:fixed;bottom:80px;left:0;right:0;z-index:10;display:none;justify-content:center;gap:10px;padding:0 8px}
+#pControls.on{display:flex}
+.pbtn{width:54px;height:54px;border-radius:50%;background:rgba(0,100,200,.55);border:2px solid rgba(255,255,255,.6);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;user-select:none}
+.pbtn:active{background:rgba(0,150,255,.9)}
+#exit{position:fixed;top:8px;right:8px;z-index:11;display:none;background:rgba(200,0,0,.75);color:#fff;border:2px solid #fff;border-radius:8px;padding:8px 14px;font-size:13px}
+#exit.on{display:block}
 </style>
 </head>
 <body>
-<div id="app"></div>
-
-<div id="info">
-  <b>💣</b> выбери инструмент, потом <b>тапни по цели</b><br>
-  Свайп — камера · 2 пальца — зум
+<div id="info"><b>Выбери инструмент → тапни по цели</b><br>Свайп — камера · 2 пальца — зум</div>
+<div id="exit">✕ Выйти из самолёта</div>
+<div id="pControls">
+<div class="pbtn" id="pL">◄</div>
+<div class="pbtn" id="pU">▲</div>
+<div class="pbtn" id="pD">▼</div>
+<div class="pbtn" id="pR">►</div>
 </div>
-
-<div id="crosshair"></div>
-
 <div id="hud">
-  <div class="btn active" data-mode="bomb">💣</div>
-  <div class="btn" data-mode="grenade">✋</div>
-  <div class="btn" data-mode="plane">✈️</div>
+<div class="btn active" data-mode="bomb">💣</div>
+<div class="btn" data-mode="grenade">✋</div>
+<div class="btn" data-mode="rocket">🚀</div>
+<div class="btn" data-mode="plane">✈️</div>
 </div>
-
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-// ========== НАСТРОЙКИ ПОД ТЕЛЕФОН ==========
-const MOBILE_QUALITY = {
-  pixelRatio: 0.7,        // пониженное разрешение для FPS
-  shadows: false,
-  cityRadius: 2,          // кварталов от центра (меньше = быстрее)
-  debrisLife: 2.5,
-  maxDebris: 60,
-  lampLights: false
-};
-
-// ---------- Сцена ----------
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.Fog(0x87ceeb, 120, 400);
-
-const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 1500);
-camera.position.set(50, 60, 100);
-
-const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, MOBILE_QUALITY.pixelRatio * 2));
-renderer.setSize(innerWidth, innerHeight);
-if (MOBILE_QUALITY.shadows) renderer.shadowMap.enabled = true;
-document.getElementById('app').appendChild(renderer.domElement);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.maxPolarAngle = Math.PI/2.05;
-controls.minDistance = 30;
-controls.maxDistance = 250;
-controls.target.set(0, 5, 0);
-// касания
-controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
-
-// ---------- Свет (без теней) ----------
-scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.1));
-const sun = new THREE.DirectionalLight(0xffffff, 1.3);
-sun.position.set(80, 150, 60);
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script>
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87ceeb);
+scene.fog=new THREE.Fog(0x87ceeb,100,350);
+const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,1500);
+camera.position.set(50,60,100);
+const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.4));
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x445566,1.1));
+const sun=new THREE.DirectionalLight(0xffffff,1.3);
+sun.position.set(80,150,60);
 scene.add(sun);
-
-// ---------- Земля и дороги ----------
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(800, 800),
-  new THREE.MeshLambertMaterial({ color:0x3a5a3a })
-);
-ground.rotation.x = -Math.PI/2;
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(800,800),new THREE.MeshLambertMaterial({color:0x3a5a3a}));
+ground.rotation.x=-Math.PI/2;
 scene.add(ground);
-
-const roadMat = new THREE.MeshLambertMaterial({ color:0x222222 });
-for (let i = -3; i <= 3; i++) {
-  const h = new THREE.Mesh(new THREE.PlaneGeometry(280, 8), roadMat);
-  h.rotation.x = -Math.PI/2; h.position.set(0, 0.01, i*40);
-  scene.add(h);
-  const v = new THREE.Mesh(new THREE.PlaneGeometry(8, 280), roadMat);
-  v.rotation.x = -Math.PI/2; v.position.set(i*40, 0.01, 0);
-  scene.add(v);
+const roadMat=new THREE.MeshLambertMaterial({color:0x222222});
+for(let i=-3;i<=3;i++){
+  const h=new THREE.Mesh(new THREE.PlaneGeometry(280,8),roadMat);
+  h.rotation.x=-Math.PI/2;h.position.set(0,.01,i*40);scene.add(h);
+  const v=new THREE.Mesh(new THREE.PlaneGeometry(8,280),roadMat);
+  v.rotation.x=-Math.PI/2;v.position.set(i*40,.01,0);scene.add(v);
 }
-
-// ---------- Здания ----------
-const buildings = [];
-const FLOOR_HEIGHT = 4;
-const buildingColors = [0x8899aa, 0xaa9988, 0x99aabb, 0xbbaa99, 0xa0a0a0, 0xc0b8a8];
-
-function createBuilding(x, z, w, d, floors) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  const mat = new THREE.MeshLambertMaterial({
-    color: buildingColors[Math.floor(Math.random()*buildingColors.length)]
-  });
-  const floorMeshes = [];
-
-  for (let i = 0; i < floors; i++) {
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(w, FLOOR_HEIGHT, d), mat);
-    floor.position.y = i * FLOOR_HEIGHT + FLOOR_HEIGHT/2;
-    floor.userData = { building: group, floorIndex: i };
-    group.add(floor);
-    floorMeshes.push(floor);
+const buildings=[],FLOOR_H=4,bColors=[0x8899aa,0xaa9988,0x99aabb,0xbbaa99,0xa0a0a0,0xc0b8a8];
+function mkB(x,z,w,d,f){
+  const g=new THREE.Group();g.position.set(x,0,z);
+  const m=new THREE.MeshLambertMaterial({color:bColors[Math.floor(Math.random()*6)]});
+  const fl=[];
+  for(let i=0;i<f;i++){
+    const p=new THREE.Mesh(new THREE.BoxGeometry(w,FLOOR_H,d),m);
+    p.position.y=i*FLOOR_H+FLOOR_H/2;p.userData={fi:i};g.add(p);fl.push(p);
   }
-
-  const roof = new THREE.Mesh(
-    new THREE.BoxGeometry(w*1.05, 0.6, d*1.05),
-    new THREE.MeshLambertMaterial({ color:0x555555 })
-  );
-  roof.position.y = floors * FLOOR_HEIGHT;
-  roof.userData = { building: group, floorIndex: floors };
-  group.add(roof);
-  floorMeshes.push(roof);
-
-  group.userData = {
-    floors, floorHeight: FLOOR_HEIGHT, width: w, depth: d,
-    floorMeshes, destroyed: new Set(), alive: true
-  };
-
-  scene.add(group);
-  buildings.push(group);
+  const r=new THREE.Mesh(new THREE.BoxGeometry(w*1.05,.5,d*1.05),new THREE.MeshLambertMaterial({color:0x555555}));
+  r.position.y=f*FLOOR_H;r.userData={fi:f};g.add(r);fl.push(r);
+  g.userData={floors:f,floorMeshes:fl,alive:true,width:w,depth:d,destroyed:new Set()};
+  scene.add(g);buildings.push(g);
 }
-
-for (let gx = -MOBILE_QUALITY.cityRadius; gx <= MOBILE_QUALITY.cityRadius; gx++) {
-  for (let gz = -MOBILE_QUALITY.cityRadius; gz <= MOBILE_QUALITY.cityRadius; gz++) {
-    if (Math.abs(gx) <= 0 && Math.abs(gz) <= 0) continue;
-    const cx = gx*40, cz = gz*40;
-    for (let i = 0; i < 2; i++) {
-      const ox = cx + (Math.random()-0.5)*18;
-      const oz = cz + (Math.random()-0.5)*18;
-      const w = 8 + Math.random()*6;
-      const d = 8 + Math.random()*6;
-      const f = 3 + Math.floor(Math.random()*8);
-      createBuilding(ox, oz, w, d, f);
+for(let gx=-2;gx<=2;gx++)for(let gz=-2;gz<=2;gz++){
+  if(!gx&&!gz)continue;
+  const cx=gx*40,cz=gz*40;
+  for(let i=0;i<2;i++){
+    mkB(cx+(Math.random()-.5)*18,cz+(Math.random()-.5)*18,8+Math.random()*5,8+Math.random()*5,3+Math.floor(Math.random()*8));
+  }
+  if(Math.random()<.3)mkB(cx+(Math.random()-.5)*18,cz+(Math.random()-.5)*18,10,10,12+Math.floor(Math.random()*8));
+}
+const poleMat=new THREE.MeshLambertMaterial({color:0x333333}),lampMat=new THREE.MeshBasicMaterial({color:0xffdd55});
+const poleGeo=new THREE.CylinderGeometry(.3,.3,10,6),headGeo=new THREE.SphereGeometry(.8,8,8);
+for(let i=-3;i<=3;i++)for(const z of[15,-15]){
+  const p=new THREE.Mesh(poleGeo,poleMat);p.position.set(i*40+15,5,z);scene.add(p);
+  const h=new THREE.Mesh(headGeo,lampMat);h.position.set(i*40+15,10.3,z);scene.add(h);
+}
+const cars=[],wheelGeo=new THREE.CylinderGeometry(.4,.4,.3,8),wheelMat=new THREE.MeshLambertMaterial({color:0x111111});
+const glassMat=new THREE.MeshLambertMaterial({color:0x223344}),lightMat=new THREE.MeshBasicMaterial({color:0xffffaa});
+function mkCar(x,z,rot){
+  const g=new THREE.Group(),col=Math.random()*0xffffff;
+  const body=new THREE.Mesh(new THREE.BoxGeometry(2,1,4),new THREE.MeshLambertMaterial({color:col}));
+  body.position.y=.9;g.add(body);
+  const top=new THREE.Mesh(new THREE.BoxGeometry(1.8,.8,2),glassMat);top.position.y=1.8;g.add(top);
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(1.9,.15,2.1),new THREE.MeshLambertMaterial({color:col}));
+  roof.position.y=2.25;g.add(roof);
+  for(const wx of[-1,1])for(const wz of[-1.3,1.3]){
+    const w=new THREE.Mesh(wheelGeo,wheelMat);w.rotation.z=Math.PI/2;w.position.set(wx*.95,.4,wz);g.add(w);
+  }
+  for(const fx of[-.6,.6]){
+    const l=new THREE.Mesh(new THREE.BoxGeometry(.4,.3,.1),lightMat);l.position.set(fx,1,2.05);g.add(l);
+  }
+  g.position.set(x,0,z);g.rotation.y=rot;scene.add(g);cars.push(g);
+}
+for(let i=-3;i<=3;i++)for(let j=0;j<2;j++){
+  const along=Math.random()<.5;
+  const x=along?i*40+(Math.random()-.5)*2:(Math.random()-.5)*80;
+  const z=along?(Math.random()-.5)*80:i*40+(Math.random()-.5)*2;
+  mkCar(x,z,along?0:Math.PI/2);
+}
+const azs=[],tankMat=new THREE.MeshLambertMaterial({color:0xdd3333}),azsMat=new THREE.MeshLambertMaterial({color:0xeeeeee});
+function mkAzs(x,z){
+  const g=new THREE.Group();
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(14,.5,10),azsMat);roof.position.y=6;g.add(roof);
+  for(const cx of[-6,6])for(const cz of[-4,4]){
+    const col=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,6,8),azsMat);
+    col.position.set(cx,3,cz);g.add(col);
+  }
+  for(const px of[-3,3]){
+    const p=new THREE.Mesh(new THREE.BoxGeometry(1.2,2,.8),new THREE.MeshLambertMaterial({color:0xcccccc}));
+    p.position.set(px,1,0);g.add(p);
+  }
+  for(let i=0;i<3;i++){
+    const t=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,4,10),tankMat);
+    t.rotation.z=Math.PI/2;t.position.set(-6+i*2,1.2,8);g.add(t);
+  }
+  g.position.set(x,0,z);g.userData={exploded:false};scene.add(g);azs.push(g);
+}
+mkAzs(20,40);mkAzs(-60,-20);mkAzs(60,-60);
+const debris=[],MAX_DEB=80;
+function spawnDebris(pos,mat,size,force){
+  if(debris.length>=MAX_DEB){const o=debris.shift();scene.remove(o.mesh);}
+  const p=new THREE.Mesh(new THREE.BoxGeometry(size.x*(.4+Math.random()*.5),size.y*(.4+Math.random()*.5),size.z*(.4+Math.random()*.5)),mat);
+  p.position.copy(pos);scene.add(p);
+  debris.push({mesh:p,vel:new THREE.Vector3((Math.random()-.5)*force,Math.random()*force*.7+2,(Math.random()-.5)*force),rot:new THREE.Vector3((Math.random()-.5)*6,(Math.random()-.5)*6,(Math.random()-.5)*6),life:4});
+}
+const collapseQ=[];
+function destroyFloor(b,fi){
+  const d=b.userData;if(!d.alive)return;
+  const s=Math.min(fi,d.floorMeshes.length-1);
+  for(let i=s;i<d.floorMeshes.length;i++){
+    if(d.destroyed.has(i))continue;
+    collapseQ.push({b,fi:i,time:(i-s)*.12});
+  }
+}
+function processQ(dt){
+  for(let i=collapseQ.length-1;i>=0;i--){
+    const c=collapseQ[i];c.time-=dt;if(c.time>0)continue;
+    const d=c.b.userData,fi=c.fi;
+    if(d.destroyed.has(fi)){collapseQ.splice(i,1);continue;}
+    const m=d.floorMeshes[fi];
+    if(!m||!m.parent){collapseQ.splice(i,1);continue;}
+    d.destroyed.add(fi);
+    const wp=new THREE.Vector3();m.getWorldPosition(wp);
+    const bb=new THREE.Box3().setFromObject(m),sz=new THREE.Vector3();bb.getSize(sz);
+    const pc=5+Math.floor(Math.random()*4);
+    for(let p=0;p<pc;p++){
+      const pos=wp.clone();
+      pos.x+=(Math.random()-.5)*sz.x*.9;pos.y+=(Math.random()-.5)*sz.y*.9;pos.z+=(Math.random()-.5)*sz.z*.9;
+      spawnDebris(pos,m.material,sz,12);
     }
-    if (Math.random() < 0.3) {
-      const ox = cx + (Math.random()-0.5)*18;
-      const oz = cz + (Math.random()-0.5)*18;
-      createBuilding(ox, oz, 10, 10, 12 + Math.floor(Math.random()*8));
+    m.parent.remove(m);collapseQ.splice(i,1);
+    if(d.destroyed.size>=d.floorMeshes.length)d.alive=false;
+  }
+}
+const fx=[],expGeo=new THREE.SphereGeometry(1,10,10),smokeGeo=new THREE.SphereGeometry(1,6,6);
+function explode(pos,radius,power){
+  const m=new THREE.MeshBasicMaterial({color:0xffaa33,transparent:true,opacity:.95});
+  const s=new THREE.Mesh(expGeo,m);s.position.copy(pos);scene.add(s);
+  fx.push({mesh:s,life:.5,max:.5,targetR:radius,type:'fireball'});
+  for(let i=0;i<5;i++){
+    const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0x333333,transparent:true,opacity:.6}));
+    sm.position.copy(pos);sm.position.x+=(Math.random()-.5)*3;sm.position.y+=Math.random()*2;sm.position.z+=(Math.random()-.5)*3;
+    sm.scale.setScalar(1.5+Math.random());scene.add(sm);
+    fx.push({mesh:sm,life:2.5,max:2.5,targetR:radius*.7,type:'smoke',vel:new THREE.Vector3((Math.random()-.5)*2,1+Math.random(),(Math.random()-.5)*2)});
+  }
+  const light=new THREE.PointLight(0xffaa33,300,radius*5);light.position.copy(pos);scene.add(light);
+  fx.push({light,life:.35,max:.35});
+  for(const b of buildings){
+    const d=b.userData;if(!d.alive)continue;
+    const dd=Math.hypot(b.position.x-pos.x,b.position.z-pos.z);
+    if(dd>radius+Math.max(d.width,d.depth))continue;
+    let hf=Math.floor((pos.y-b.position.y)/FLOOR_H);
+    hf=Math.max(0,Math.min(hf,d.floors-1));
+    destroyFloor(b,hf);
+  }
+  for(const a of azs){
+    if(a.userData.exploded)continue;
+    const dd=Math.hypot(a.position.x-pos.x,a.position.z-pos.z);
+    if(dd<radius+6){
+      a.userData.exploded=true;
+      setTimeout(()=>explode(new THREE.Vector3(a.position.x,2,a.position.z),30,45),150);
+    }
+  }
+  for(const car of cars){
+    const dx=car.position.x-pos.x,dz=car.position.z-pos.z,dist=Math.hypot(dx,dz);
+    if(dist<radius){
+      const f=(1-dist/radius)*power;
+      car.userData.vel=car.userData.vel||new THREE.Vector3();
+      car.userData.vel.x+=(dx/(dist||1))*f;car.userData.vel.z+=(dz/(dist||1))*f;car.userData.vel.y+=f*.6;
     }
   }
 }
-
-// ---------- Фонари ----------
-const poleMat = new THREE.MeshLambertMaterial({ color:0x333333 });
-const lampMat = new THREE.MeshBasicMaterial({ color:0xffdd55 });
-const poleGeo = new THREE.CylinderGeometry(0.3, 0.3, 10);
-const headGeo = new THREE.SphereGeometry(0.8);
-for (let i = -3; i <= 3; i++) {
-  for (const z of [15, -15]) {
-    const pole = new THREE.Mesh(poleGeo, poleMat);
-    pole.position.set(i*40 + 15, 5, z);
-    scene.add(pole);
-    const head = new THREE.Mesh(headGeo, lampMat);
-    head.position.set(i*40 + 15, 10.3, z);
-    scene.add(head);
-  }
+const rockets=[];
+function launchRocket(from,to){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,2,8),new THREE.MeshLambertMaterial({color:0xcc3333}));
+  body.rotation.x=Math.PI/2;g.add(body);
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(.25,.6,8),new THREE.MeshLambertMaterial({color:0x333333}));
+  tip.rotation.x=Math.PI/2;tip.position.z=1.3;g.add(tip);
+  g.position.copy(from);g.lookAt(to);scene.add(g);
+  const dir=to.clone().sub(from).normalize();
+  rockets.push({mesh:g,vel:dir.multiplyScalar(70),life:3});
 }
-
-// ---------- Машины ----------
-const cars = [];
-const carBodyGeo = new THREE.BoxGeometry(2, 1.2, 4);
-const carTopGeo = new THREE.BoxGeometry(1.8, 0.9, 2);
-const carTopMat = new THREE.MeshLambertMaterial({ color:0x222233 });
-for (let i = -3; i <= 3; i++) {
-  for (let j = 0; j < 2; j++) {
-    const alongRoad = Math.random() < 0.5;
-    const x = alongRoad ? i*40 + (Math.random()-0.5)*2 : (Math.random()-0.5)*80;
-    const z = alongRoad ? (Math.random()-0.5)*80 : i*40 + (Math.random()-0.5)*2;
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(carBodyGeo,
-      new THREE.MeshLambertMaterial({ color: Math.random()*0xffffff }));
-    body.position.y = 1;
-    g.add(body);
-    const top = new THREE.Mesh(carTopGeo, carTopMat);
-    top.position.y = 2;
-    g.add(top);
-    g.position.set(x, 0, z);
-    g.rotation.y = alongRoad ? 0 : Math.PI/2;
-    scene.add(g);
-    cars.push(g);
+const planes=[];
+let playerPlane=null;
+const planeBodyGeo=new THREE.CylinderGeometry(.9,.9,9,12),planeMat=new THREE.MeshLambertMaterial({color:0xdddddd});
+const wingMat=new THREE.MeshLambertMaterial({color:0xcccccc}),engMat=new THREE.MeshLambertMaterial({color:0x333333});
+function mkPlane(){
+  const g=new THREE.Group();
+  const b=new THREE.Mesh(planeBodyGeo,planeMat);b.rotation.z=Math.PI/2;g.add(b);
+  const n=new THREE.Mesh(new THREE.ConeGeometry(.9,2,12),planeMat);n.rotation.z=-Math.PI/2;n.position.x=5.5;g.add(n);
+  const w=new THREE.Mesh(new THREE.BoxGeometry(3,.3,14),wingMat);w.position.x=.5;g.add(w);
+  const th=new THREE.Mesh(new THREE.BoxGeometry(2,2.5,.3),wingMat);th.position.set(-4,1.3,0);g.add(th);
+  const tv=new THREE.Mesh(new THREE.BoxGeometry(1.5,.3,4),wingMat);tv.position.set(-4,1,0);g.add(tv);
+  for(const zz of[-2.5,2.5]){
+    const e=new THREE.Mesh(new THREE.CylinderGeometry(.6,.6,3,10),engMat);
+    e.rotation.z=Math.PI/2;e.position.set(0,-1,zz);g.add(e);
   }
+  return g;
 }
-
-// ---------- Разрушение ----------
-const debris = [];
-
-function destroyFloor(buildingGroup, floorIndex) {
-  const data = buildingGroup.userData;
-  if (!data.alive) return;
-
-  for (let i = floorIndex; i < data.floorMeshes.length; i++) {
-    if (data.destroyed.has(i)) continue;
-    data.destroyed.add(i);
-    const mesh = data.floorMeshes[i];
-    if (!mesh.parent) continue;
-
-    const worldPos = new THREE.Vector3();
-    mesh.getWorldPosition(worldPos);
-    const bbox = new THREE.Box3().setFromObject(mesh);
-    const size = new THREE.Vector3();
-    bbox.getSize(size);
-
-    const pieces = 4 + Math.floor(Math.random()*4);
-    for (let p = 0; p < pieces; p++) {
-      if (debris.length >= MOBILE_QUALITY.maxDebris) {
-        const old = debris.shift();
-        scene.remove(old.mesh);
+function launchPlane(){
+  const alive=buildings.filter(b=>b.userData.alive);
+  if(!alive.length)return;
+  const t=alive[Math.floor(Math.random()*alive.length)];
+  const tp=t.position.clone();tp.y=t.userData.floors*FLOOR_H*.5;
+  const g=mkPlane();
+  const st=tp.clone();st.x+=200;st.y+=60;st.z+=(Math.random()-.5)*80;
+  g.position.copy(st);g.lookAt(tp);g.rotateY(Math.PI/2);scene.add(g);
+  playerPlane={mesh:g,speed:50,target:tp,targetBuilding:t};
+  document.getElementById('pControls').classList.add('on');
+  document.getElementById('exit').classList.add('on');
+  document.getElementById('hud').style.opacity='.4';
+  controls.enabled=false;
+}
+function updatePlane(dt){
+  if(!playerPlane)return;
+  const p=playerPlane;
+  if(planeInput.left)p.mesh.rotateZ(-.8*dt);
+  if(planeInput.right)p.mesh.rotateZ(.8*dt);
+  if(planeInput.up)p.mesh.rotateX(-.6*dt);
+  if(planeInput.down)p.mesh.rotateX(.6*dt);
+  const fwd=new THREE.Vector3(1,0,0).applyQuaternion(p.mesh.quaternion);
+  p.mesh.position.addScaledVector(fwd,p.speed*dt);
+  if(Math.random()<.6){
+    const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0x666666,transparent:true,opacity:.5}));
+    sm.position.copy(p.mesh.position);sm.position.y-=1;sm.scale.setScalar(.8+Math.random()*.5);scene.add(sm);
+    fx.push({mesh:sm,life:1.2,max:1.2,targetR:3,type:'smoke',vel:new THREE.Vector3(0,.5,0)});
+  }
+  if(p.mesh.position.y<2){explode(p.mesh.position.clone(),30,40);scene.remove(p.mesh);playerPlane=null;endPlane();return;}
+  for(const b of buildings){
+    if(!b.userData.alive)continue;
+    const dx=p.mesh.position.x-b.position.x,dz=p.mesh.position.z-b.position.z;
+    if(Math.abs(dx)<b.userData.width/2+2&&Math.abs(dz)<b.userData.depth/2+2){
+      if(p.mesh.position.y>b.position.y&&p.mesh.position.y<b.userData.floors*FLOOR_H+2){
+        explode(p.mesh.position.clone(),32,45);
+        let hf=Math.floor((p.mesh.position.y-b.position.y)/FLOOR_H);
+        hf=Math.max(0,Math.min(hf,b.userData.floors-1));
+        destroyFloor(b,hf);
+        scene.remove(p.mesh);playerPlane=null;endPlane();return;
       }
-      const piece = new THREE.Mesh(
-        new THREE.BoxGeometry(
-          size.x/3 * (0.5 + Math.random()*0.5),
-          size.y/2 * (0.5 + Math.random()*0.5),
-          size.z/3 * (0.5 + Math.random()*0.5)
-        ),
-        mesh.material
-      );
-      piece.position.copy(worldPos);
-      piece.position.x += (Math.random()-0.5) * size.x * 0.8;
-      piece.position.y += (Math.random()-0.5) * size.y * 0.8;
-      piece.position.z += (Math.random()-0.5) * size.z * 0.8;
-      scene.add(piece);
-      debris.push({
-        mesh: piece,
-        vel: new THREE.Vector3(
-          (Math.random()-0.5) * 10,
-          Math.random() * 6 + 1,
-          (Math.random()-0.5) * 10
-        ),
-        rot: new THREE.Vector3(
-          (Math.random()-0.5) * 5,
-          (Math.random()-0.5) * 5,
-          (Math.random()-0.5) * 5
-        ),
-        life: MOBILE_QUALITY.debrisLife
-      });
-    }
-    mesh.parent.remove(mesh);
-  }
-
-  if (data.destroyed.size >= data.floorMeshes.length) data.alive = false;
-}
-
-// ---------- Взрывы ----------
-const explosions = [];
-const expGeo = new THREE.SphereGeometry(1, 12, 12);
-
-function explode(position, radius, power) {
-  const mat = new THREE.MeshBasicMaterial({ color:0xffaa33, transparent:true, opacity:0.9 });
-  const sphere = new THREE.Mesh(expGeo, mat);
-  sphere.position.copy(position);
-  scene.add(sphere);
-  explosions.push({ mesh: sphere, life: 0.5, maxLife: 0.5, targetRadius: radius });
-
-  // разрушение зданий
-  for (const b of buildings) {
-    const data = b.userData;
-    if (!data.alive) continue;
-    const distXZ = Math.hypot(b.position.x - position.x, b.position.z - position.z);
-    if (distXZ > radius + Math.max(data.width, data.depth)) continue;
-    const localY = position.y - b.position.y;
-    let hitFloor = Math.floor(localY / data.floorHeight);
-    hitFloor = Math.max(0, Math.min(hitFloor, data.floors));
-    destroyFloor(b, hitFloor);
-  }
-
-  // отбрасываем машины
-  for (const car of cars) {
-    const dx = car.position.x - position.x;
-    const dz = car.position.z - position.z;
-    const dist = Math.hypot(dx, dz);
-    if (dist < radius) {
-      const force = (1 - dist/radius) * power;
-      car.userData.vel = car.userData.vel || new THREE.Vector3();
-      car.userData.vel.x += (dx/(dist||1)) * force;
-      car.userData.vel.z += (dz/(dist||1)) * force;
-      car.userData.vel.y += force * 0.6;
     }
   }
+  const off=new THREE.Vector3(-12,4,0).applyQuaternion(p.mesh.quaternion);
+  camera.position.copy(p.mesh.position).add(off);
+  camera.lookAt(p.mesh.position);
 }
-
-// ---------- Самолёты ----------
-const planes = [];
-const planeBodyGeo = new THREE.CylinderGeometry(0.8, 0.8, 8, 10);
-const planeBodyMat = new THREE.MeshLambertMaterial({ color:0xdddddd });
-const planeWingGeo = new THREE.BoxGeometry(10, 0.3, 2);
-const planeTailGeo = new THREE.BoxGeometry(1, 2, 0.3);
-const planeMat = new THREE.MeshLambertMaterial({ color:0xcccccc });
-
-function launchPlane() {
-  const alive = buildings.filter(b => b.userData.alive);
-  if (!alive.length) return;
-  const target = alive[Math.floor(Math.random()*alive.length)];
-  const targetPos = target.position.clone();
-  targetPos.y = (target.userData.floors * FLOOR_HEIGHT) / 2;
-
-  const start = targetPos.clone();
-  start.x += 180 + Math.random()*80;
-  start.y += 50 + Math.random()*30;
-  start.z += (Math.random()-0.5) * 80;
-
-  const g = new THREE.Group();
-  const body = new THREE.Mesh(planeBodyGeo, planeBodyMat);
-  body.rotation.z = Math.PI/2;
-  g.add(body);
-  const wing = new THREE.Mesh(planeWingGeo, planeMat);
-  g.add(wing);
-  const tail = new THREE.Mesh(planeTailGeo, planeMat);
-  tail.position.set(-4, 1, 0);
-  g.add(tail);
-
-  g.position.copy(start);
-  g.lookAt(targetPos);
-  g.rotateY(Math.PI/2);
-  scene.add(g);
-
-  const dir = targetPos.clone().sub(start).normalize();
-  planes.push({
-    mesh: g, vel: dir.multiplyScalar(85),
-    target: targetPos, targetBuilding: target, t: 0
-  });
+function endPlane(){
+  controls.enabled=true;controls.target.set(0,5,0);
+  camera.position.set(50,60,100);
+  document.getElementById('pControls').classList.remove('on');
+  document.getElementById('exit').classList.remove('on');
+  document.getElementById('hud').style.opacity='1';
 }
-
-// ---------- Тач-управление ----------
-let currentMode = 'bomb';
-let pointerDownPos = null;
-let didMove = false;
-
-document.querySelectorAll('.btn').forEach(btn => {
-  btn.addEventListener('click', e => {
-    e.stopPropagation();
-    document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentMode = btn.dataset.mode;
-  });
-  btn.addEventListener('touchstart', e => {
-    e.stopPropagation();
-    btn.classList.add('active');
-  }, { passive:true });
-  btn.addEventListener('touchend', e => {
-    e.stopPropagation();
-  }, { passive:true });
+const planeInput={left:false,right:false,up:false,down:false};
+function bindH(id,k){
+  const el=document.getElementById(id);
+  el.addEventListener('touchstart',e=>{e.preventDefault();planeInput[k]=true;},{passive:false});
+  el.addEventListener('touchend',e=>{e.preventDefault();planeInput[k]=false;},{passive:false});
+}
+bindH('pL','left');bindH('pR','right');bindH('pU','up');bindH('pD','down');
+document.getElementById('exit').addEventListener('click',()=>{
+  if(playerPlane){scene.remove(playerPlane.mesh);playerPlane=null;}
+  endPlane();
 });
-
-const raycaster = new THREE.Raycaster();
-const tapNDC = new THREE.Vector2();
-
-function screenToWorld(clientX, clientY) {
-  tapNDC.x = (clientX / innerWidth) * 2 - 1;
-  tapNDC.y = -(clientY / innerHeight) * 2 + 1;
-  raycaster.setFromCamera(tapNDC, camera);
-  const targets = [];
-  scene.traverse(o => {
-    if (o.isMesh && o !== ground && !o.userData.isExplosion && !o.userData.isDebris) {
-      targets.push(o);
-    }
+let camTheta=Math.PI/4,camPhi=Math.PI/3,camDist=120;
+const camTarget=new THREE.Vector3(0,5,0);
+const controls={enabled:true,update(){
+  if(!this.enabled)return;
+  camPhi=Math.max(.2,Math.min(Math.PI/2.05,camPhi));
+  camDist=Math.max(30,Math.min(250,camDist));
+  camera.position.x=camTarget.x+camDist*Math.sin(camPhi)*Math.cos(camTheta);
+  camera.position.y=camTarget.y+camDist*Math.cos(camPhi);
+  camera.position.z=camTarget.z+camDist*Math.sin(camPhi)*Math.sin(camTheta);
+  camera.lookAt(camTarget);
+}};
+let touchStart=null,pinchStart=0;
+renderer.domElement.addEventListener('touchstart',e=>{
+  if(e.touches.length===1){touchStart={x:e.touches[0].clientX,y:e.touches[0].clientY,t:Date.now(),moved:false};}
+  else if(e.touches.length===2){
+    pinchStart=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    touchStart=null;
+  }
+},{passive:true});
+renderer.domElement.addEventListener('touchmove',e=>{
+  if(e.touches.length===1&&touchStart&&controls.enabled){
+    const dx=e.touches[0].clientX-touchStart.x,dy=e.touches[0].clientY-touchStart.y;
+    if(Math.hypot(dx,dy)>5)touchStart.moved=true;
+    camTheta-=dx*.01;camPhi-=dy*.01;
+    touchStart.x=e.touches[0].clientX;touchStart.y=e.touches[0].clientY;
+  }else if(e.touches.length===2&&pinchStart){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    camDist*=pinchStart/d;pinchStart=d;
+  }
+},{passive:true});
+renderer.domElement.addEventListener('touchend',e=>{
+  if(touchStart&&!touchStart.moved&&Date.now()-touchStart.t<400&&!playerPlane)handleTap(touchStart.x,touchStart.y);
+  touchStart=null;pinchStart=0;
+},{passive:true});
+let mode='bomb';
+document.querySelectorAll('#hud .btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('#hud .btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');mode=b.dataset.mode;
+    if(mode==='plane')launchPlane();
   });
-  const hits = raycaster.intersectObjects(targets, false);
-  if (hits.length > 0) return hits[0].point.clone();
-  const gHit = raycaster.intersectObject(ground, false);
-  if (gHit.length > 0) return gHit[0].point.clone();
+});
+const raycaster=new THREE.Raycaster(),ndc=new THREE.Vector2();
+function aim(x,y){
+  ndc.x=(x/innerWidth)*2-1;ndc.y=-(y/innerHeight)*2+1;
+  raycaster.setFromCamera(ndc,camera);
+  const t=[];scene.traverse(o=>{if(o.isMesh&&o!==ground)t.push(o);});
+  const h=raycaster.intersectObjects(t,false);
+  if(h.length)return h[0].point.clone();
+  const hg=raycaster.intersectObject(ground,false);
+  if(hg.length)return hg[0].point.clone();
   return null;
 }
-
-function handleTap(clientX, clientY) {
-  if (currentMode === 'plane') {
-    launchPlane();
-    return;
+function handleTap(x,y){
+  const p=aim(x,y);if(!p)return;
+  if(mode==='bomb')explode(p,20,22);
+  else if(mode==='grenade')explode(p,9,10);
+  else if(mode==='rocket'){
+    const start=camera.position.clone();
+    launchRocket(start,p);
   }
-  const p = screenToWorld(clientX, clientY);
-  if (!p) return;
-  if (currentMode === 'bomb') explode(p, 20, 22);
-  else explode(p, 9, 10);
 }
-
-// Различаем тап и свайп
-const dom = renderer.domElement;
-dom.addEventListener('touchstart', e => {
-  if (e.touches.length === 1) {
-    pointerDownPos = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
-    didMove = false;
-  } else {
-    pointerDownPos = null;
+const cl=new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);
+  const dt=Math.min(cl.getDelta(),.05);
+  processQ(dt);
+  for(let i=debris.length-1;i>=0;i--){
+    const d=debris[i];d.vel.y-=22*dt;d.mesh.position.addScaledVector(d.vel,dt);
+    if(d.mesh.position.y<.3){d.mesh.position.y=.3;d.vel.y*=-.25;d.vel.x*=.7;d.vel.z*=.7;}
+    d.mesh.rotation.x+=d.rot.x*dt;d.mesh.rotation.y+=d.rot.y*dt;d.mesh.rotation.z+=d.rot.z*dt;
+    d.life-=dt;if(d.life<0){scene.remove(d.mesh);debris.splice(i,1);}
   }
-}, { passive:true });
-
-dom.addEventListener('touchmove', e => {
-  if (pointerDownPos && e.touches.length === 1) {
-    const dx = e.touches[0].clientX - pointerDownPos.x;
-    const dy = e.touches[0].clientY - pointerDownPos.y;
-    if (Math.hypot(dx, dy) > 10) didMove = true;
+  for(let i=fx.length-1;i>=0;i--){
+    const e=fx[i];e.life-=dt;const k=Math.max(0,e.life/e.max);
+    if(e.mesh){
+      const s=e.targetR*(1-k*k);e.mesh.scale.setScalar(Math.max(.1,s));
+      e.mesh.material.opacity=k*(e.type==='smoke'?.6:1);
+      if(e.vel)e.mesh.position.addScaledVector(e.vel,dt);
+      if(e.life<=0){scene.remove(e.mesh);fx.splice(i,1);}
+    }else if(e.light){e.light.intensity=300*k;if(e.life<=0){scene.remove(e.light);fx.splice(i,1);}}
   }
-}, { passive:true });
-
-dom.addEventListener('touchend', e => {
-  if (pointerDownPos && !didMove) {
-    const dt = Date.now() - pointerDownPos.t;
-    if (dt < 400) handleTap(pointerDownPos.x, pointerDownPos.y);
-  }
-  pointerDownPos = null;
-  didMove = false;
-}, { passive:true });
-
-// ПК (для отладки)
-dom.addEventListener('click', e => {
-  if (pointerDownPos === null) handleTap(e.clientX, e.clientY);
-});
-window.addEventListener('keydown', e => {
-  if (e.key.toLowerCase() === 'b') launchPlane();
-});
-
-// ---------- Анимация ----------
-const clock = new THREE.Clock();
-const tmpVec = new THREE.Vector3();
-
-function animate() {
-  requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
-
-  // обломки
-  for (let i = debris.length - 1; i >= 0; i--) {
-    const d = debris[i];
-    d.vel.y -= 22 * dt;
-    d.mesh.position.addScaledVector(d.vel, dt);
-    if (d.mesh.position.y < 0.3) {
-      d.mesh.position.y = 0.3;
-      d.vel.y *= -0.25;
-      d.vel.x *= 0.7;
-      d.vel.z *= 0.7;
+  for(let i=rockets.length-1;i>=0;i--){
+    const r=rockets[i];r.mesh.position.addScaledVector(r.vel,dt);r.life-=dt;
+    if(Math.random()<.9){
+      const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0xaaaaaa,transparent:true,opacity:.5}));
+      sm.position.copy(r.mesh.position);sm.scale.setScalar(.6);scene.add(sm);
+      fx.push({mesh:sm,life:.8,max:.8,targetR:1.5,type:'smoke',vel:new THREE.Vector3(0,.3,0)});
     }
-    d.mesh.rotation.x += d.rot.x * dt;
-    d.mesh.rotation.y += d.rot.y * dt;
-    d.mesh.rotation.z += d.rot.z * dt;
-    d.life -= dt;
-    if (d.life < 0) {
-      scene.remove(d.mesh);
-      d.mesh.geometry.dispose();
-      debris.splice(i, 1);
+    let hit=false;
+    for(const b of buildings){
+      if(!b.userData.alive)continue;
+      const dx=r.mesh.position.x-b.position.x,dz=r.mesh.position.z-b.position.z;
+      if(Math.abs(dx)<b.userData.width/2&&Math.abs(dz)<b.userData.depth/2&&r.mesh.position.y>0&&r.mesh.position.y<b.userData.floors*FLOOR_H){hit=true;break;}
+    }
+    if(r.life<=0||r.mesh.position.y<0||hit){
+      explode(r.mesh.position.clone(),18,20);
+      scene.remove(r.mesh);rockets.splice(i,1);
     }
   }
-
-  // взрывы
-  for (let i = explosions.length - 1; i >= 0; i--) {
-    const ex = explosions[i];
-    ex.life -= dt;
-    const k = Math.max(0, ex.life / ex.maxLife);
-    const s = ex.targetRadius * (1 - k*k);
-    ex.mesh.scale.setScalar(Math.max(0.1, s));
-    ex.mesh.material.opacity = k;
-    if (ex.life <= 0) {
-      scene.remove(ex.mesh);
-      ex.mesh.material.dispose();
-      explosions.splice(i, 1);
-    }
+  for(const car of cars){
+    const v=car.userData.vel;if(!v)continue;
+    car.position.addScaledVector(v,dt);v.y-=18*dt;
+    if(car.position.y<=0){car.position.y=0;v.y*=-.3;v.x*=.8;v.z*=.8;}
   }
-
-  // машины
-  for (const car of cars) {
-    const v = car.userData.vel;
-    if (!v) continue;
-    car.position.addScaledVector(v, dt);
-    v.y -= 18 * dt;
-    if (car.position.y <= 0) {
-      car.position.y = 0;
-      v.y *= -0.3;
-      v.x *= 0.8;
-      v.z *= 0.8;
-    }
-  }
-
-  // самолёты
-  for (let i = planes.length - 1; i >= 0; i--) {
-    const p = planes[i];
-    p.mesh.position.addScaledVector(p.vel, dt);
-    p.t += dt;
-
-    // столкновение
-    if (p.mesh.position.distanceTo(p.target) < 6) {
-      explode(p.mesh.position, 26, 36);
-      const b = p.targetBuilding;
-      if (b && b.userData.alive) {
-        const data = b.userData;
-        const localY = p.mesh.position.y - b.position.y;
-        let hf = Math.floor(localY / data.floorHeight);
-        hf = Math.max(0, Math.min(hf, data.floors));
-        destroyFloor(b, hf);
-      }
-      // обломки самолёта
-      for (let k = 0; k < 12; k++) {
-        if (debris.length >= MOBILE_QUALITY.maxDebris) {
-          const old = debris.shift();
-          scene.remove(old.mesh);
-        }
-        const piece = new THREE.Mesh(
-          new THREE.BoxGeometry(0.5+Math.random(), 0.5+Math.random(), 0.5+Math.random()),
-          planeMat
-        );
-        piece.position.copy(p.mesh.position);
-        scene.add(piece);
-        debris.push({
-          mesh: piece,
-          vel: new THREE.Vector3(
-            (Math.random()-0.5)*25, Math.random()*18, (Math.random()-0.5)*25
-          ),
-          rot: new THREE.Vector3(
-            (Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10
-          ),
-          life: MOBILE_QUALITY.debrisLife
-        });
-      }
-      scene.remove(p.mesh);
-      planes.splice(i, 1);
-    } else if (p.t > 8) {
-      scene.remove(p.mesh);
-      planes.splice(i, 1);
-    }
-  }
-
+  updatePlane(dt);
   controls.update();
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
 }
-
-window.addEventListener('resize', () => {
-  camera.aspect = innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+loop();
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
 });
-
-animate();
 </script>
 </body>
-  </html>
+</html>
