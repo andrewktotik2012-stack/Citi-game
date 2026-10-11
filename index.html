@@ -18,11 +18,16 @@ html,body{width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:
 #exit{position:fixed;top:8px;right:8px;z-index:11;display:none;background:rgba(200,0,0,.75);color:#fff;border:2px solid #fff;border-radius:8px;padding:8px 14px;font-size:13px}
 #exit.on{display:block}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20;transition:opacity .3s}
+/* КАБИНА HTML */
+#cockpit{position:fixed;bottom:0;left:0;right:0;height:130px;z-index:9;display:none;pointer-events:none}
+#cockpit.on{display:block}
+#cockpit canvas{width:100%;height:100%;display:block}
 </style>
 </head>
 <body>
 <div id="info"><b>Выбери → тапни по цели</b><br>Свайп — камера · 2 пальца — зум</div>
 <div id="flash"></div>
+<div id="cockpit"><canvas id="cockpitCanvas"></canvas></div>
 <div id="exit">✕ Выйти из самолёта</div>
 <div id="pControls">
 <div class="pbtn" id="pL">◄</div>
@@ -41,8 +46,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:
 <script>
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x87ceeb);
-scene.fog=new THREE.Fog(0x87ceeb,100,400);
-const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,1500);
+scene.fog=new THREE.Fog(0x87ceeb,100,450);
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,1500);
 camera.position.set(50,60,100);
 const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.3));
@@ -53,29 +58,44 @@ const sun=new THREE.DirectionalLight(0xffffff,1.3);
 sun.position.set(80,150,60);
 scene.add(sun);
 
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(800,800),new THREE.MeshLambertMaterial({color:0x3a5a3a}));
+// ЗЕМЛЯ
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(1000,1000),new THREE.MeshLambertMaterial({color:0x3a5a3a}));
 ground.rotation.x=-Math.PI/2;
 scene.add(ground);
 
-const riverZ=-70;
-const river=new THREE.Mesh(new THREE.PlaneGeometry(800,26),new THREE.MeshLambertMaterial({color:0x2a6ea8,transparent:true,opacity:.85}));
+// РЕКА И МОСТ
+const riverZ=-90;
+const river=new THREE.Mesh(new THREE.PlaneGeometry(1000,30),new THREE.MeshLambertMaterial({color:0x2a6ea8,transparent:true,opacity:.85}));
 river.rotation.x=-Math.PI/2;river.position.set(0,.05,riverZ);
 scene.add(river);
-const bridgeMat=new THREE.MeshLambertMaterial({color:0x888888});
-const bridge=new THREE.Group();
-const bDeck=new THREE.Mesh(new THREE.BoxGeometry(8,.8,34),bridgeMat);
-bDeck.position.y=3;bridge.add(bDeck);
-for(let i=-15;i<=15;i+=5){
-  const p=new THREE.Mesh(new THREE.CylinderGeometry(.6,.6,3,8),bridgeMat);
-  p.position.set(0,1.5,i);bridge.add(p);
-}
-for(const x of[-3.8,3.8]){
-  const r=new THREE.Mesh(new THREE.BoxGeometry(.3,1.5,34),new THREE.MeshLambertMaterial({color:0x666666}));
-  r.position.set(x,4.1,0);bridge.add(r);
-}
-bridge.position.set(0,0,riverZ);
-scene.add(bridge);
 
+// МОСТ (разрушаемый)
+const bridgeParts=[];
+function mkBridge(){
+  const g=new THREE.Group();
+  // пролёты по секциям — каждый ломается отдельно
+  for(let i=-15;i<=15;i+=5){
+    const deck=new THREE.Mesh(new THREE.BoxGeometry(10,.8,4.5),new THREE.MeshLambertMaterial({color:0x999999}));
+    deck.position.set(0,3,i);
+    deck.userData={isBridge:true};
+    g.add(deck);bridgeParts.push(deck);
+  }
+  // колонны
+  for(const z of[-15,-5,5,15]){
+    const p=new THREE.Mesh(new THREE.CylinderGeometry(.7,.7,3,8),new THREE.MeshLambertMaterial({color:0x888888}));
+    p.position.set(0,1.5,z);g.add(p);
+  }
+  // перила
+  for(const x of[-4.5,4.5]){
+    const r=new THREE.Mesh(new THREE.BoxGeometry(.3,1.5,34),new THREE.MeshLambertMaterial({color:0x666666}));
+    r.position.set(x,4.1,0);g.add(r);
+  }
+  g.position.set(0,0,riverZ);
+  scene.add(g);
+}
+mkBridge();
+
+// ТЕКСТУРА ОКОН
 function windowTexture(w,h,color){
   const c=document.createElement('canvas');
   c.width=128;c.height=128;
@@ -84,11 +104,9 @@ function windowTexture(w,h,color){
   ctx.fillStyle=`rgb(${cr},${cg},${cb})`;
   ctx.fillRect(0,0,128,128);
   const cols=4,rows=4,pad=8;
-  const ww=(128-pad*(cols+1))/cols;
-  const wh=(128-pad*(rows+1))/rows;
+  const ww=(128-pad*(cols+1))/cols,wh=(128-pad*(rows+1))/rows;
   for(let r=0;r<rows;r++)for(let col=0;col<cols;col++){
-    const lit=Math.random()>0.5;
-    ctx.fillStyle=lit?'#ffdd88':'#2a3a4a';
+    ctx.fillStyle=Math.random()>0.5?'#ffdd88':'#2a3a4a';
     ctx.fillRect(pad+col*(ww+pad),pad+r*(wh+pad),ww,wh);
   }
   const tex=new THREE.CanvasTexture(c);
@@ -97,6 +115,7 @@ function windowTexture(w,h,color){
   return tex;
 }
 
+// ЗДАНИЯ
 const buildings=[],FLOOR_H=4;
 const bColors=[0x8899aa,0xaa9988,0x99aabb,0xbbaa99,0xa0a0a0,0xc0b8a8];
 function mkB(x,z,w,d,f){
@@ -117,11 +136,12 @@ function mkB(x,z,w,d,f){
 for(let gx=-2;gx<=2;gx++)for(let gz=-2;gz<=2;gz++){
   if(!gx&&!gz)continue;
   const cx=gx*40,cz=gz*40;
-  if(Math.abs(cz-riverZ)<18)continue;
+  if(Math.abs(cz-riverZ)<22)continue;
   for(let i=0;i<2;i++)mkB(cx+(Math.random()-.5)*18,cz+(Math.random()-.5)*18,8+Math.random()*5,8+Math.random()*5,3+Math.floor(Math.random()*8));
   if(Math.random()<.3)mkB(cx+(Math.random()-.5)*18,cz+(Math.random()-.5)*18,10,10,12+Math.floor(Math.random()*8));
 }
 
+// ДОРОГИ
 const roadMat=new THREE.MeshLambertMaterial({color:0x222222});
 for(let i=-3;i<=3;i++){
   const h=new THREE.Mesh(new THREE.PlaneGeometry(280,8),roadMat);
@@ -130,6 +150,7 @@ for(let i=-3;i<=3;i++){
   v.rotation.x=-Math.PI/2;v.position.set(i*40,.01,0);scene.add(v);
 }
 
+// ФОНАРИ
 const lamps=[],poleMat=new THREE.MeshLambertMaterial({color:0x333333}),lampMat=new THREE.MeshBasicMaterial({color:0xffdd55});
 const poleGeo=new THREE.CylinderGeometry(.3,.3,10,6),headGeo=new THREE.SphereGeometry(.8,8,8);
 function mkLamp(x,z){
@@ -142,6 +163,7 @@ function mkLamp(x,z){
 }
 for(let i=-3;i<=3;i++)for(const z of[15,-15])mkLamp(i*40+15,z);
 
+// МАШИНЫ
 const cars=[],wheelGeo=new THREE.CylinderGeometry(.4,.4,.3,8),wheelMat=new THREE.MeshLambertMaterial({color:0x111111});
 const glassMat=new THREE.MeshLambertMaterial({color:0x223344}),lightMat=new THREE.MeshBasicMaterial({color:0xffffaa});
 function mkCar(x,z,rot){
@@ -165,10 +187,11 @@ for(let i=-3;i<=3;i++)for(let j=0;j<2;j++){
   const along=Math.random()<.5;
   const x=along?i*40+(Math.random()-.5)*2:(Math.random()-.5)*80;
   const z=along?(Math.random()-.5)*80:i*40+(Math.random()-.5)*2;
-  if(Math.abs(z-riverZ)<18)continue;
+  if(Math.abs(z-riverZ)<22)continue;
   mkCar(x,z,along?0:Math.PI/2);
 }
 
+// АЗС
 const azs=[],tankMat=new THREE.MeshLambertMaterial({color:0xdd3333}),azsMat=new THREE.MeshLambertMaterial({color:0xeeeeee});
 function mkAzs(x,z){
   const g=new THREE.Group();
@@ -189,6 +212,34 @@ function mkAzs(x,z){
 }
 mkAzs(20,40);mkAzs(-60,-20);mkAzs(60,-20);
 
+// АЭРОДРОМ (за рекой, юг)
+const airportZ=-140;
+const runway=new THREE.Mesh(new THREE.PlaneGeometry(120,14),new THREE.MeshLambertMaterial({color:0x333333}));
+runway.rotation.x=-Math.PI/2;
+runway.position.set(0,.02,airportZ);
+scene.add(runway);
+// разметка
+for(let i=-50;i<=50;i+=10){
+  const line=new THREE.Mesh(new THREE.PlaneGeometry(4,.5),new THREE.MeshBasicMaterial({color:0xffffff}));
+  line.rotation.x=-Math.PI/2;line.position.set(i,.03,airportZ);
+  scene.add(line);
+}
+// вышка
+const towerBase=new THREE.Mesh(new THREE.BoxGeometry(4,20,4),new THREE.MeshLambertMaterial({color:0xcccccc}));
+towerBase.position.set(20,10,airportZ+12);
+scene.add(towerBase);
+const towerTop=new THREE.Mesh(new THREE.BoxGeometry(6,4,6),new THREE.MeshLambertMaterial({color:0x3366aa}));
+towerTop.position.set(20,22,airportZ+12);
+scene.add(towerTop);
+// ангар
+const hangar=new THREE.Mesh(new THREE.BoxGeometry(20,8,14),new THREE.MeshLambertMaterial({color:0x888888}));
+hangar.position.set(-40,4,airportZ+15);
+scene.add(hangar);
+const hangarRoof=new THREE.Mesh(new THREE.CylinderGeometry(10,10,20,12,1,false,0,Math.PI),new THREE.MeshLambertMaterial({color:0x666666}));
+hangarRoof.rotation.z=Math.PI/2;hangarRoof.position.set(-40,8,airportZ+15);
+scene.add(hangarRoof);
+
+// ОБЛОМКИ
 const debris=[],MAX_DEB=100;
 function spawnDebris(pos,mat,size,force){
   if(debris.length>=MAX_DEB){const o=debris.shift();scene.remove(o.mesh);}
@@ -197,6 +248,7 @@ function spawnDebris(pos,mat,size,force){
   debris.push({mesh:p,vel:new THREE.Vector3((Math.random()-.5)*force,Math.random()*force*.7+2,(Math.random()-.5)*force),rot:new THREE.Vector3((Math.random()-.5)*6,(Math.random()-.5)*6,(Math.random()-.5)*6),life:4});
 }
 
+// ОБРУШЕНИЕ
 const collapseQ=[];
 function destroyFloor(b,fi){
   const d=b.userData;if(!d.alive)return;
@@ -228,6 +280,7 @@ function processQ(dt){
   }
 }
 
+// ВЗРЫВЫ
 const fx=[],expGeo=new THREE.SphereGeometry(1,10,10),smokeGeo=new THREE.SphereGeometry(1,6,6);
 function explode(pos,radius,power,isNuke){
   const fireColor=isNuke?0xffffee:0xffaa33;
@@ -256,6 +309,7 @@ function explode(pos,radius,power,isNuke){
   const light=new THREE.PointLight(fireColor,isNuke?800:300,radius*6);
   light.position.copy(pos);scene.add(light);
   fx.push({light,life:isNuke?.8:.35,max:isNuke?.8:.35});
+  // здания
   for(const b of buildings){
     const d=b.userData;if(!d.alive)continue;
     const dd=Math.hypot(b.position.x-pos.x,b.position.z-pos.z);
@@ -264,6 +318,18 @@ function explode(pos,radius,power,isNuke){
     hf=Math.max(0,Math.min(hf,d.floors-1));
     destroyFloor(b,hf);
   }
+  // МОСТ
+  for(const part of bridgeParts){
+    if(!part.parent)continue;
+    const wp=new THREE.Vector3();part.getWorldPosition(wp);
+    const dd=Math.hypot(wp.x-pos.x,wp.z-pos.z);
+    if(dd<radius+5){
+      const sz=new THREE.Vector3(10,.8,4.5);
+      for(let p=0;p<8;p++)spawnDebris(wp,part.material,sz,18);
+      part.parent.remove(part);
+    }
+  }
+  // АЗС
   for(const a of azs){
     if(a.userData.exploded)continue;
     const dd=Math.hypot(a.position.x-pos.x,a.position.z-pos.z);
@@ -274,6 +340,7 @@ function explode(pos,radius,power,isNuke){
       setTimeout(()=>explode(ap,28,40,false),150);
     }
   }
+  // ФОНАРИ
   for(const lamp of lamps){
     if(lamp.userData.falling)continue;
     const dd=Math.hypot(lamp.position.x-pos.x,lamp.position.z-pos.z);
@@ -285,6 +352,7 @@ function explode(pos,radius,power,isNuke){
       lamp.userData.rot.set((Math.random()-.5)*4,(Math.random()-.5)*4,(Math.random()-.5)*4);
     }
   }
+  // МАШИНЫ
   for(const car of cars){
     if(car.userData.exploded)continue;
     const dx=car.position.x-pos.x,dz=car.position.z-pos.z,dist=Math.hypot(dx,dz);
@@ -311,6 +379,7 @@ function explode(pos,radius,power,isNuke){
   }
 }
 
+// РАКЕТЫ
 const rockets=[];
 function launchRocket(from,to){
   const g=new THREE.Group();
@@ -323,10 +392,8 @@ function launchRocket(from,to){
   rockets.push({mesh:g,vel:dir.multiplyScalar(70),life:3});
 }
 
-// ========== САМОЛЁТ + КАБИНА ==========
+// САМОЛЁТ
 let playerPlane=null;
-let cockpit=null;
-
 const planeBodyGeo=new THREE.CylinderGeometry(.9,.9,9,12),planeMat=new THREE.MeshLambertMaterial({color:0xdddddd});
 const wingMat=new THREE.MeshLambertMaterial({color:0xcccccc}),engMat=new THREE.MeshLambertMaterial({color:0x333333});
 function mkPlane(){
@@ -343,140 +410,112 @@ function mkPlane(){
   return g;
 }
 
-// Кабина — рисованная текстура с приборами
-function makeCockpitTexture(){
-  const c=document.createElement('canvas');
-  c.width=1024;c.height=512;
-  const ctx=c.getContext('2d');
-  // фон панели
-  const grad=ctx.createLinearGradient(0,0,0,512);
-  grad.addColorStop(0,'#2a2a2a');
-  grad.addColorStop(1,'#1a1a1a');
-  ctx.fillStyle=grad;ctx.fillRect(0,0,1024,512);
-  // штурвал (внизу по центру)
-  ctx.strokeStyle='#111';ctx.lineWidth=14;
-  ctx.beginPath();ctx.arc(512,540,90,0,Math.PI*2);ctx.stroke();
-  ctx.strokeStyle='#222';ctx.lineWidth=10;
-  ctx.beginPath();ctx.moveTo(512,450);ctx.lineTo(512,540);ctx.stroke();
-  // приборы — 4 круглых датчика
-  function gauge(x,y,r,label,val){
-    ctx.fillStyle='#0a0a0a';
-    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#555';ctx.lineWidth=3;
-    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();
+// Запуск с аэродрома
+function launchPlane(){
+  const g=mkPlane();
+  // старт на ВПП, в западном конце
+  g.position.set(-55,1,airportZ);
+  // нос на восток (по полосе)
+  g.rotation.y=0;
+  scene.add(g);
+  playerPlane={
+    mesh:g,
+    speed:0,           // разгон с 0
+    maxSpeed:55,
+    targetAltitude:0,  // пока на земле
+    flying:false,
+    time:0
+  };
+  document.getElementById('pControls').classList.add('on');
+  document.getElementById('exit').classList.add('on');
+  document.getElementById('hud').style.opacity='.4';
+  document.getElementById('cockpit').classList.add('on');
+  controls.enabled=false;
+  drawCockpit();
+}
+
+// HTML-кабина
+const ck=document.getElementById('cockpitCanvas');
+const ckCtx=ck.getContext('2d');
+function drawCockpit(){
+  const W=ck.width=window.innerWidth;
+  const H=ck.height=130;
+  ckCtx.clearRect(0,0,W,H);
+  // панель
+  const grad=ckCtx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(30,30,30,0.85)');
+  grad.addColorStop(1,'rgba(15,15,15,0.95)');
+  ckCtx.fillStyle=grad;
+  ckCtx.fillRect(0,0,W,H);
+  // штурвал
+  ckCtx.strokeStyle='#000';ckCtx.lineWidth=10;
+  ckCtx.beginPath();ckCtx.arc(W/2,H+30,80,0,Math.PI*2);ckCtx.stroke();
+  ckCtx.strokeStyle='#222';ckCtx.lineWidth=8;
+  ckCtx.beginPath();ckCtx.moveTo(W/2,0);ckCtx.lineTo(W/2,H+30);ckCtx.stroke();
+  // приборы
+  const cnt=5;
+  for(let i=0;i<cnt;i++){
+    const x=W/2-(cnt-1)*45+i*90;
+    const y=40;const r=32;
+    ckCtx.fillStyle='#0a0a0a';
+    ckCtx.beginPath();ckCtx.arc(x,y,r,0,Math.PI*2);ckCtx.fill();
+    ckCtx.strokeStyle='#666';ckCtx.lineWidth=2;
+    ckCtx.beginPath();ckCtx.arc(x,y,r,0,Math.PI*2);ckCtx.stroke();
     // деления
-    ctx.strokeStyle='#aaa';ctx.lineWidth=2;
-    for(let i=0;i<12;i++){
-      const a=(i/12)*Math.PI*2-Math.PI/2;
-      const x1=x+Math.cos(a)*(r-8);
-      const y1=y+Math.sin(a)*(r-8);
-      const x2=x+Math.cos(a)*(r-18);
-      const y2=y+Math.sin(a)*(r-18);
-      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    ckCtx.strokeStyle='#888';ckCtx.lineWidth=1;
+    for(let k=0;k<12;k++){
+      const a=(k/12)*Math.PI*2-Math.PI/2;
+      ckCtx.beginPath();
+      ckCtx.moveTo(x+Math.cos(a)*(r-4),y+Math.sin(a)*(r-4));
+      ckCtx.lineTo(x+Math.cos(a)*(r-10),y+Math.sin(a)*(r-10));
+      ckCtx.stroke();
     }
     // стрелка
-    const a=val*Math.PI*2-Math.PI/2;
-    ctx.strokeStyle='#ff3030';ctx.lineWidth=3;
-    ctx.beginPath();ctx.moveTo(x,y);
-    ctx.lineTo(x+Math.cos(a)*(r-15),y+Math.sin(a)*(r-15));ctx.stroke();
-    // точка
-    ctx.fillStyle='#ddd';
-    ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();
-    // подпись
-    ctx.fillStyle='#8af';ctx.font='bold 16px monospace';ctx.textAlign='center';
-    ctx.fillText(label,x,y+r+22);
-  }
-  gauge(180,130,60,'SPEED',0.7);
-  gauge(360,130,60,'ALT',0.5);
-  gauge(540,130,60,'FUEL',0.85);
-  gauge(720,130,60,'RPM',0.6);
-  gauge(900,130,60,'HDG',0.3);
-  // центральный индикатор
-  ctx.fillStyle='#0a0a0a';ctx.fillRect(420,240,200,90);
-  ctx.strokeStyle='#555';ctx.lineWidth=3;ctx.strokeRect(420,240,200,90);
-  ctx.fillStyle='#0f0';ctx.font='bold 24px monospace';ctx.textAlign='center';
-  ctx.fillText('AUTO',520,285);
-  ctx.fillStyle='#0a0';ctx.font='14px monospace';
-  ctx.fillText('PILOT',520,310);
-  // рычаги тяги
-  for(let i=0;i<3;i++){
-    const x=200+i*50;
-    ctx.fillStyle='#333';ctx.fillRect(x-6,400,12,60);
-    ctx.fillStyle='#666';ctx.fillRect(x-12,395,24,14);
+    const a=Math.random()*Math.PI*2-Math.PI/2;
+    ckCtx.strokeStyle='#ff3030';ckCtx.lineWidth=2;
+    ckCtx.beginPath();ckCtx.moveTo(x,y);
+    ckCtx.lineTo(x+Math.cos(a)*(r-8),y+Math.sin(a)*(r-8));ckCtx.stroke();
+    ckCtx.fillStyle='#ddd';
+    ckCtx.beginPath();ckCtx.arc(x,y,3,0,Math.PI*2);ckCtx.fill();
   }
   // лампочки
   const lampColors=['#f00','#0f0','#ff0','#f80'];
   for(let i=0;i<8;i++){
-    const x=140+i*40,y=470;
-    ctx.fillStyle=lampColors[i%4];
-    ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#111';ctx.lineWidth=2;ctx.stroke();
+    const x=30+i*40,y=110;
+    ckCtx.fillStyle=lampColors[i%4];
+    ckCtx.beginPath();ckCtx.arc(x,y,5,0,Math.PI*2);ckCtx.fill();
   }
-  // винты/болты по краям
-  ctx.fillStyle='#444';
-  for(const p of[[20,20],[1004,20],[20,492],[1004,492]]){
-    ctx.beginPath();ctx.arc(p[0],p[1],5,0,Math.PI*2);ctx.fill();
-  }
-  return new THREE.CanvasTexture(c);
-}
-
-function makeCockpit(){
-  const g=new THREE.Group();
-  // сама панель — плоская картинка, приклеенная к камере
-  const tex=makeCockpitTexture();
-  const panel=new THREE.Mesh(
-    new THREE.PlaneGeometry(2.4,1.2),
-    new THREE.MeshBasicMaterial({map:tex,transparent:false})
-  );
-  panel.position.set(0,-0.7,-1.5);
-  g.add(panel);
-  // стёкла — рама
-  const frameMat=new THREE.MeshBasicMaterial({color:0x111111,transparent:true,opacity:.85});
-  const frameTop=new THREE.Mesh(new THREE.BoxGeometry(2.5,.12,.1),frameMat);
-  frameTop.position.set(0,.55,-1.5);g.add(frameTop);
-  const frameLeft=new THREE.Mesh(new THREE.BoxGeometry(.12,1.5,.1),frameMat);
-  frameLeft.position.set(-1.2,0,-1.5);g.add(frameLeft);
-  const frameRight=new THREE.Mesh(new THREE.BoxGeometry(.12,1.5,.1),frameMat);
-  frameRight.position.set(1.2,0,-1.5);g.add(frameRight);
-  return g;
-}
-
-function launchPlane(){
-  const alive=buildings.filter(b=>b.userData.alive);
-  if(!alive.length)return;
-  const t=alive[Math.floor(Math.random()*alive.length)];
-  const tp=t.position.clone();tp.y=t.userData.floors*FLOOR_H*.5;
-  const g=mkPlane();
-  const st=tp.clone();st.x+=200;st.y+=80;st.z+=(Math.random()-.5)*80;
-  g.position.copy(st);g.lookAt(tp);g.rotateY(Math.PI/2);scene.add(g);
-  playerPlane={mesh:g,speed:55,target:tp,targetBuilding:t};
-  // КАБИНА
-  cockpit=makeCockpit();
-  camera.add(cockpit);
-  scene.add(camera);
-  document.getElementById('pControls').classList.add('on');
-  document.getElementById('exit').classList.add('on');
-  document.getElementById('hud').style.opacity='.4';
-  controls.enabled=false;
 }
 
 function updatePlane(dt){
   if(!playerPlane)return;
   const p=playerPlane;
-  const turnSpeed=1.4,pitchSpeed=1.0,autoLevel=0.6;
-  // ПРАВИЛЬНЫЕ ОСИ:
-  // ◄ ► — поворот (rotation.y — вокруг вертикали)
-  if(planeInput.left)p.mesh.rotation.y+=turnSpeed*dt;
-  if(planeInput.right)p.mesh.rotation.y-=turnSpeed*dt;
-  // ▲ ▼ — нос вверх/вниз (rotation.z)
-  if(planeInput.up)p.mesh.rotation.z=Math.max(p.mesh.rotation.z-pitchSpeed*dt,-0.5);
-  else if(planeInput.down)p.mesh.rotation.z=Math.min(p.mesh.rotation.z+pitchSpeed*dt,0.5);
-  else p.mesh.rotation.z*=1-autoLevel*dt;
-  // движение вперёд
-  const fwd=new THREE.Vector3(1,0,0).applyQuaternion(p.mesh.quaternion);
-  p.mesh.position.addScaledVector(fwd,p.speed*dt);
+  p.time+=dt;
+  // разгон
+  if(!p.flying){
+    p.speed=Math.min(p.maxSpeed,p.speed+18*dt);
+    p.mesh.position.x+=Math.cos(-p.mesh.rotation.y)*p.speed*dt;
+    p.mesh.position.z+=Math.sin(-p.mesh.rotation.y)*p.speed*dt;
+    // отрыв при скорости 45
+    if(p.speed>45&&p.mesh.position.x>20){
+      p.flying=true;
+    }
+  }else{
+    // полёт
+    p.speed=Math.min(p.maxSpeed,p.speed+8*dt);
+    if(planeInput.left)p.mesh.rotation.y+=1.2*dt;
+    if(planeInput.right)p.mesh.rotation.y-=1.2*dt;
+    // нос вверх/вниз — изменяет высоту
+    if(planeInput.up)p.mesh.position.y+=8*dt;
+    if(planeInput.down)p.mesh.position.y-=8*dt;
+    // самолёт летит вперёд
+    const fwd=new THREE.Vector3(1,0,0).applyQuaternion(p.mesh.quaternion);
+    p.mesh.position.addScaledVector(fwd,p.speed*dt);
+    // не ниже 8 м
+    if(p.mesh.position.y<8)p.mesh.position.y=8;
+  }
   // дым
-  if(Math.random()<.6){
+  if(Math.random()<.4){
     const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0x666666,transparent:true,opacity:.5}));
     sm.position.copy(p.mesh.position);sm.position.y-=1;sm.scale.setScalar(.8+Math.random()*.5);scene.add(sm);
     fx.push({mesh:sm,life:1.2,max:1.2,targetR:3,type:'smoke',vel:new THREE.Vector3(0,.5,0)});
@@ -495,28 +534,22 @@ function updatePlane(dt){
       }
     }
   }
-  // КАМЕРА — из кабины (чуть сзади и выше носа)
-  const camOffset=new THREE.Vector3(2.5,1.2,0).applyQuaternion(p.mesh.quaternion);
+  // КАМЕРА — сзади-сверху самолёта
+  const camOffset=new THREE.Vector3(-16,6,0).applyQuaternion(p.mesh.quaternion);
   camera.position.copy(p.mesh.position).add(camOffset);
-  const lookDir=new THREE.Vector3(1,0,0).applyQuaternion(p.mesh.quaternion);
-  camera.lookAt(camera.position.clone().add(lookDir.multiplyScalar(50)));
-  // кабина следует за камерой
-  if(cockpit){
-    cockpit.position.set(0,0,0);
-    cockpit.quaternion.copy(camera.quaternion);
-  }
+  const lookAt=p.mesh.position.clone().add(new THREE.Vector3(15,0,0).applyQuaternion(p.mesh.quaternion));
+  camera.lookAt(lookAt);
 }
+
 function endPlane(){
-  if(cockpit){
-    camera.remove(cockpit);
-    cockpit=null;
-  }
   controls.enabled=true;controls.target.set(0,5,0);
   camera.position.set(50,60,100);
   document.getElementById('pControls').classList.remove('on');
   document.getElementById('exit').classList.remove('on');
   document.getElementById('hud').style.opacity='1';
+  document.getElementById('cockpit').classList.remove('on');
 }
+
 const planeInput={left:false,right:false,up:false,down:false};
 function bindH(id,k){
   const el=document.getElementById(id);
@@ -529,12 +562,13 @@ document.getElementById('exit').addEventListener('click',()=>{
   endPlane();
 });
 
-let camTheta=Math.PI/4,camPhi=Math.PI/3,camDist=120;
+// КАМЕРА
+let camTheta=Math.PI/4,camPhi=Math.PI/3,camDist=140;
 const camTarget=new THREE.Vector3(0,5,0);
 const controls={enabled:true,update(){
   if(!this.enabled)return;
   camPhi=Math.max(.2,Math.min(Math.PI/2.05,camPhi));
-  camDist=Math.max(30,Math.min(250,camDist));
+  camDist=Math.max(30,Math.min(300,camDist));
   camera.position.x=camTarget.x+camDist*Math.sin(camPhi)*Math.cos(camTheta);
   camera.position.y=camTarget.y+camDist*Math.cos(camPhi);
   camera.position.z=camTarget.z+camDist*Math.sin(camPhi)*Math.sin(camTheta);
@@ -577,7 +611,7 @@ const raycaster=new THREE.Raycaster(),ndc=new THREE.Vector2();
 function aim(x,y){
   ndc.x=(x/innerWidth)*2-1;ndc.y=-(y/innerHeight)*2+1;
   raycaster.setFromCamera(ndc,camera);
-  const t=[];scene.traverse(o=>{if(o.isMesh&&o!==ground&&o!==river&&(!cockpit||!cockpit.children.includes(o)))t.push(o);});
+  const t=[];scene.traverse(o=>{if(o.isMesh&&o!==ground&&o!==river)t.push(o);});
   const h=raycaster.intersectObjects(t,false);
   if(h.length)return h[0].point.clone();
   const hg=raycaster.intersectObject(ground,false);
@@ -639,7 +673,6 @@ function loop(){
     car.position.addScaledVector(v,dt);v.y-=18*dt;
     if(car.position.y<=0){car.position.y=0;v.y*=-.3;v.x*=.8;v.z*=.8;}
   }
-  // фонари падают
   for(const lamp of lamps){
     if(!lamp.userData.falling)continue;
     const v=lamp.userData.vel;v.y-=22*dt;
@@ -657,6 +690,7 @@ loop();
 addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
+  if(playerPlane)drawCockpit();
 });
 </script>
 </body>
