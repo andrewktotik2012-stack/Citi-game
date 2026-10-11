@@ -477,4 +477,95 @@ renderer.domElement.addEventListener('touchend',e=>{
   touchStart=null;pinchStart=0;
 },{passive:true});
 
-// ============ ВЫБОР ИНСТРУМЕНТА =
+// ============ ВЫБОР ИНСТРУМЕНТА ============
+let mode='bomb';
+document.querySelectorAll('#hud .btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('#hud .btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');mode=b.dataset.mode;
+    if(mode==='plane')launchPlane();
+  });
+});
+
+// ============ ТАП ============
+const raycaster=new THREE.Raycaster(),ndc=new THREE.Vector2();
+function aim(x,y){
+  ndc.x=(x/innerWidth)*2-1;ndc.y=-(y/innerHeight)*2+1;
+  raycaster.setFromCamera(ndc,camera);
+  const t=[];scene.traverse(o=>{if(o.isMesh&&o!==ground&&o!==river)t.push(o);});
+  const h=raycaster.intersectObjects(t,false);
+  if(h.length)return h[0].point.clone();
+  const hg=raycaster.intersectObject(ground,false);
+  if(hg.length)return hg[0].point.clone();
+  const hr=raycaster.intersectObject(river,false);
+  if(hr.length)return hr[0].point.clone();
+  return null;
+}
+function handleTap(x,y){
+  const p=aim(x,y);if(!p)return;
+  if(mode==='bomb')explode(p,20,22,false);
+  else if(mode==='grenade')explode(p,9,10,false);
+  else if(mode==='rocket')launchRocket(camera.position.clone(),p);
+  else if(mode==='nuke')explode(p,60,60,true);
+}
+
+// ============ ЦИКЛ ============
+const cl=new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);
+  const dt=Math.min(cl.getDelta(),.05);
+  processQ(dt);
+  for(let i=debris.length-1;i>=0;i--){
+    const d=debris[i];d.vel.y-=22*dt;d.mesh.position.addScaledVector(d.vel,dt);
+    if(d.mesh.position.y<.3){d.mesh.position.y=.3;d.vel.y*=-.25;d.vel.x*=.7;d.vel.z*=.7;}
+    d.mesh.rotation.x+=d.rot.x*dt;d.mesh.rotation.y+=d.rot.y*dt;d.mesh.rotation.z+=d.rot.z*dt;
+    d.life-=dt;if(d.life<0){scene.remove(d.mesh);debris.splice(i,1);}
+  }
+  for(let i=fx.length-1;i>=0;i--){
+    const e=fx[i];e.life-=dt;const k=Math.max(0,e.life/e.max);
+    if(e.mesh){
+      if(e.type==='stem'){
+        e.mesh.material.opacity=.7*k;
+      }else{
+        const s=e.targetR*(1-k*k);e.mesh.scale.setScalar(Math.max(.1,s));
+        e.mesh.material.opacity=k*(e.type==='smoke'?.6:1);
+      }
+      if(e.vel)e.mesh.position.addScaledVector(e.vel,dt);
+      if(e.life<=0){scene.remove(e.mesh);fx.splice(i,1);}
+    }else if(e.light){e.light.intensity=(e.max>.5?800:300)*k;if(e.life<=0){scene.remove(e.light);fx.splice(i,1);}}
+  }
+  for(let i=rockets.length-1;i>=0;i--){
+    const r=rockets[i];r.mesh.position.addScaledVector(r.vel,dt);r.life-=dt;
+    if(Math.random()<.9){
+      const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0xaaaaaa,transparent:true,opacity:.5}));
+      sm.position.copy(r.mesh.position);sm.scale.setScalar(.6);scene.add(sm);
+      fx.push({mesh:sm,life:.8,max:.8,targetR:1.5,type:'smoke',vel:new THREE.Vector3(0,.3,0)});
+    }
+    let hit=false;
+    for(const b of buildings){
+      if(!b.userData.alive)continue;
+      const dx=r.mesh.position.x-b.position.x,dz=r.mesh.position.z-b.position.z;
+      if(Math.abs(dx)<b.userData.width/2&&Math.abs(dz)<b.userData.depth/2&&r.mesh.position.y>0&&r.mesh.position.y<b.userData.floors*FLOOR_H){hit=true;break;}
+    }
+    if(r.life<=0||r.mesh.position.y<0||hit){
+      explode(r.mesh.position.clone(),18,20,false);
+      scene.remove(r.mesh);rockets.splice(i,1);
+    }
+  }
+  for(const car of cars){
+    const v=car.userData.vel;if(!v)continue;
+    car.position.addScaledVector(v,dt);v.y-=18*dt;
+    if(car.position.y<=0){car.position.y=0;v.y*=-.3;v.x*=.8;v.z*=.8;}
+  }
+  updatePlane(dt);
+  controls.update();
+  renderer.render(scene,camera);
+}
+loop();
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
