@@ -3,1103 +3,860 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>City Destruction</title>
+<title>House Destruction</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 html,body{width:100%;height:100%;overflow:hidden;background:#87ceeb;font-family:Arial;touch-action:none}
-#info{position:fixed;top:6px;left:6px;color:#fff;z-index:10;background:rgba(0,0,0,.55);padding:5px 9px;border-radius:6px;font-size:11px;line-height:1.4}
-#hudWrap{position:fixed;bottom:0;left:0;right:0;z-index:10;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:linear-gradient(to top,rgba(0,0,0,.7),transparent)}
-#hudRow1,#hudRow2{display:flex;justify-content:center;gap:5px;transition:transform .25s ease}
-#hudWrap.show2 #hudRow1{display:none}
-#hudWrap.show2 #hudRow2{display:flex}
-#hudRow1.hidden{display:none}
-#pageDots{display:flex;justify-content:center;gap:6px;margin-top:4px}
-.dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.4)}
-.dot.on{background:#fff}
-.btn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.4);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;user-select:none}
-.btn.active{transform:scale(.92);background:rgba(255,80,80,.5);border-color:#f66}
-#pControls{position:fixed;bottom:110px;left:0;right:0;z-index:11;display:none;justify-content:center;gap:8px;padding:0 8px}
-#pControls.on{display:flex}
-.pbtn{width:50px;height:50px;border-radius:50%;background:rgba(0,100,200,.55);border:2px solid rgba(255,255,255,.6);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;user-select:none}
-.pbtn:active{background:rgba(0,150,255,.9)}
-#exit{position:fixed;top:8px;right:8px;z-index:11;display:none;background:rgba(200,0,0,.75);color:#fff;border:2px solid #fff;border-radius:8px;padding:8px 14px;font-size:13px}
-#exit.on{display:block}
-#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:20;transition:opacity .3s}
-#shake{position:fixed;inset:0;pointer-events:none;z-index:21}
+#app{position:fixed;inset:0}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+#topBar{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.stat{background:rgba(0,0,0,.65);padding:6px 12px;border-radius:8px;color:#fff;font-size:12px;text-align:center}
+.stat .lbl{color:#8af;font-size:9px;display:block}
+.stat .val{color:#ff0;font-weight:bold;font-size:16px}
+#camBtns{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:6px;pointer-events:auto;margin-top:60px}
+.camBtn{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.55);border:2px solid #fff;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}
+#toolsBar{position:fixed;bottom:0;left:0;right:0;z-index:11;padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+  background:linear-gradient(to top,rgba(0,0,0,.8),transparent);
+  display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+.tool{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.5);
+  color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+.tool.active{background:rgba(255,100,100,.7);border-color:#f66;transform:scale(1.1)}
+#msg{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;background:rgba(0,0,0,.85);
+  padding:14px 22px;border-radius:10px;font-size:14px;z-index:15;display:none;text-align:center;max-width:80%;pointer-events:auto}
+#msg.on{display:block}
+#startHint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;background:rgba(0,0,0,.85);
+  padding:16px 20px;border-radius:10px;font-size:13px;z-index:14;text-align:center;line-height:1.7;
+  border:2px solid #4f4;max-width:88%;pointer-events:auto}
+#startHint.hidden{display:none}
+#startHint b{color:#4f4}
 </style>
 </head>
 <body>
-<div id="info"><b>Выбери инструмент → тапни</b><br>Свайп по кнопкам — 2-я страница</div>
-<div id="flash"></div>
-<div id="exit">✕ Выйти из самолёта</div>
-<div id="pControls">
-<div class="pbtn" id="pL">◄</div>
-<div class="pbtn" id="pU">▲</div>
-<div class="pbtn" id="pD">▼</div>
-<div class="pbtn" id="pR">►</div>
+<div id="app"></div>
+<div id="hud">
+  <div id="topBar">
+    <div class="stat"><span class="lbl">РАЗРУШЕНО</span><span class="val" id="destroyVal">0%</span></div>
+    <div class="stat"><span class="lbl">ОЧКИ</span><span class="val" id="scoreVal">0</span></div>
+    <div class="stat"><span class="lbl">ЭТАЖЕЙ</span><span class="val" id="floorsVal">12/12</span></div>
+  </div>
+  <div id="camBtns">
+    <button class="camBtn" id="camTop">⊞</button>
+    <button class="camBtn" id="camReset">⟲</button>
+  </div>
 </div>
-<div id="hudWrap">
-<div id="hudRow1">
-<div class="btn active" data-mode="bomb">💣</div>
-<div class="btn" data-mode="grenade">✋</div>
-<div class="btn" data-mode="rocket">🚀</div>
-<div class="btn" data-mode="plane">✈️</div>
-<div class="btn" data-mode="nuke">☢️</div>
+<div id="toolsBar">
+  <button class="tool active" data-tool="bomb">💣</button>
+  <button class="tool" data-tool="dynamite">🧨</button>
+  <button class="tool" data-tool="rocket">🚀</button>
+  <button class="tool" data-tool="lightning">⚡</button>
+  <button class="tool" data-tool="fire">🔥</button>
+  <button class="tool" data-tool="water">💧</button>
+  <button class="tool" data-tool="nuke">☢️</button>
 </div>
-<div id="hudRow2" style="display:none">
-<div class="btn" data-mode="fire">🔥</div>
-<div class="btn" data-mode="lightning">⚡</div>
-<div class="btn" data-mode="heli">🚁</div>
-<div class="btn" data-mode="tornado">🌪️</div>
-<div class="btn" data-mode="cluster">🧨</div>
-<div class="btn" data-mode="tsunami">🌊</div>
-<div class="btn" data-mode="quake">🌍</div>
+<div id="msg"></div>
+<div id="startHint">
+  <b>Разрушь дом!</b><br>
+  • Инструмент внизу → тапни по дому<br>
+  • Свайп — камера<br>
+  • 2 пальца — зум<br>
+  • ⊞ — вид сверху<br>
+  <br>
+  <i>Тапни сюда чтобы начать</i>
 </div>
-<div id="pageDots"><div class="dot on"></div><div class="dot"></div></div>
-</div>
+
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 <script>
-// ==== ОСНОВНОЕ ====
+// ============ СЦЕНА ============
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x87ceeb);
-scene.fog=new THREE.Fog(0x87ceeb,150,600);
-const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,2000);
-camera.position.set(50,60,100);
+scene.fog=new THREE.Fog(0x87ceeb,120,600);
+const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,2000);
 const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.2));
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.3));
 renderer.setSize(innerWidth,innerHeight);
-document.body.appendChild(renderer.domElement);
+document.getElementById('app').appendChild(renderer.domElement);
 scene.add(new THREE.HemisphereLight(0xffffff,0x445566,1.1));
 const sun=new THREE.DirectionalLight(0xffffff,1.3);
 sun.position.set(80,150,60);
 scene.add(sun);
 
-// ==== ЗЕМЛЯ ====
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(1200,1200),new THREE.MeshLambertMaterial({color:0x3a5a3a}));
+// ============ ЗЕМЛЯ ============
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshLambertMaterial({color:0x3a5a3a}));
 ground.rotation.x=-Math.PI/2;
 scene.add(ground);
 
-// ==== ГОРЫ ====
-function mkMountain(x,z,r,h){
-  const cone=new THREE.Mesh(new THREE.ConeGeometry(r,h,8),new THREE.MeshLambertMaterial({color:0x667755,flatShading:true}));
-  cone.position.set(x,h/2,z);cone.rotation.y=Math.random()*Math.PI;
-  scene.add(cone);
-  if(h>25){
-    const cap=new THREE.Mesh(new THREE.ConeGeometry(r*.4,h*.3,8),new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true}));
-    cap.position.set(x,h*.85,z);cap.rotation.y=cone.rotation.y;
-    scene.add(cap);
-  }
-}
-for(let a=0;a<Math.PI*2;a+=Math.PI/16){
-  const r=250+Math.random()*130;
-  mkMountain(Math.cos(a)*r,Math.sin(a)*r,10+Math.random()*15,15+Math.random()*30);
+const sidewalk=new THREE.Mesh(new THREE.PlaneGeometry(50,50),new THREE.MeshLambertMaterial({color:0x999999}));
+sidewalk.rotation.x=-Math.PI/2;sidewalk.position.y=0.02;
+scene.add(sidewalk);
+
+const road=new THREE.Mesh(new THREE.PlaneGeometry(60,12),new THREE.MeshLambertMaterial({color:0x1a1a1a}));
+road.rotation.x=-Math.PI/2;road.position.set(0,0.03,30);
+scene.add(road);
+const lineMat=new THREE.MeshBasicMaterial({color:0xffff00});
+for(let i=-25;i<=25;i+=5){
+  const l=new THREE.Mesh(new THREE.PlaneGeometry(2,.4),lineMat);
+  l.rotation.x=-Math.PI/2;l.position.set(i,0.04,30);scene.add(l);
 }
 
-// ==== РЕКА ====
-const riverZ=-90;
-const river=new THREE.Mesh(new THREE.PlaneGeometry(1000,30),new THREE.MeshLambertMaterial({color:0x2a6ea8,transparent:true,opacity:.85}));
-river.rotation.x=-Math.PI/2;river.position.set(0,.05,riverZ);
-scene.add(river);
-
-// ==== МОСТ ====
-const bridgeParts=[];
-(function mkBridge(){
+// ============ ДЕРЕВЬЯ ============
+function mkTree(x,z){
   const g=new THREE.Group();
-  for(let i=-15;i<=15;i+=5){
-    const deck=new THREE.Mesh(new THREE.BoxGeometry(10,.8,4.5),new THREE.MeshLambertMaterial({color:0x999999}));
-    deck.position.set(0,3,i);g.add(deck);bridgeParts.push(deck);
-  }
-  for(const z of[-15,-5,5,15]){
-    const p=new THREE.Mesh(new THREE.CylinderGeometry(.7,.7,3,8),new THREE.MeshLambertMaterial({color:0x888888}));
-    p.position.set(0,1.5,z);g.add(p);
-  }
-  for(const x of[-4.5,4.5]){
-    const r=new THREE.Mesh(new THREE.BoxGeometry(.3,1.5,34),new THREE.MeshLambertMaterial({color:0x666666}));
-    r.position.set(x,4.1,0);g.add(r);
-  }
-  g.position.set(0,0,riverZ);scene.add(g);
-})();
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.3,.4,3,6),new THREE.MeshLambertMaterial({color:0x5a3a20}));
+  trunk.position.y=1.5;g.add(trunk);
+  const crown=new THREE.Mesh(new THREE.SphereGeometry(2,8,6),new THREE.MeshLambertMaterial({color:0x2a6a2a}));
+  crown.position.y=4;g.add(crown);
+  g.position.set(x,0,z);scene.add(g);
+}
+mkTree(-20,-15);mkTree(20,-15);mkTree(-20,15);mkTree(20,15);mkTree(-25,0);mkTree(25,0);
 
-// ==== ДОРОГИ ====
-const roadMat=new THREE.MeshLambertMaterial({color:0x1a1a1a});
-const roadPoints=[];
-for(let i=-3;i<=3;i++){
-  const h=new THREE.Mesh(new THREE.PlaneGeometry(300,8),roadMat);
-  h.rotation.x=-Math.PI/2;h.position.set(0,.01,i*40);scene.add(h);
-  for(let j=-150;j<=150;j+=10)roadPoints.push({x:j,z:i*40});
-  const v=new THREE.Mesh(new THREE.PlaneGeometry(8,300),roadMat);
-  v.rotation.x=-Math.PI/2;v.position.set(i*40,.01,0);scene.add(v);
-  for(let j=-150;j<=150;j+=10)roadPoints.push({x:i*40,z:j});
-}
+// ============ ДОМ ============
+const house={floors:12,floorHeight:3,width:16,depth:12,floorObjects:[],wallObjects:[],windowObjects:[],destroyed:0,totalParts:0,score:0};
 
-// ==== ВОРОНКИ ====
-const craters=[];
-function addCrater(x,z,radius){
-  const crater=new THREE.Mesh(new THREE.CircleGeometry(radius*.5,16),new THREE.MeshBasicMaterial({color:0x1a1008}));
-  crater.rotation.x=-Math.PI/2;crater.position.set(x,.05,z);scene.add(crater);craters.push(crater);
-  const cnt=8;
-  for(let i=0;i<cnt;i++){
-    const a=(i/cnt)*Math.PI*2;
-    const chunk=new THREE.Mesh(new THREE.ConeGeometry(1.5+Math.random(),2+Math.random()*2,6),
-      new THREE.MeshLambertMaterial({color:0x4a3a2a,flatShading:true}));
-    chunk.position.set(x+Math.cos(a)*radius*.5,.5,z+Math.sin(a)*radius*.5);
-    chunk.rotation.y=Math.random()*Math.PI;scene.add(chunk);craters.push(chunk);
-  }
-  for(let i=0;i<3;i++){
-    const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0x555555,transparent:true,opacity:.6}));
-    sm.position.set(x+(Math.random()-.5)*3,1,z+(Math.random()-.5)*3);sm.scale.setScalar(1.5);scene.add(sm);
-    fx.push({mesh:sm,life:6,max:6,targetR:5,type:'smoke',vel:new THREE.Vector3(0,1,0)});
-  }
-}
-function checkCrater(pos,radius){
-  for(const p of roadPoints){
-    if(Math.hypot(p.x-pos.x,p.z-pos.z)<radius*.5){addCrater(pos.x,pos.z,radius);return;}
-  }
-}
+const foundation=new THREE.Mesh(new THREE.BoxGeometry(house.width+1,1,house.depth+1),new THREE.MeshLambertMaterial({color:0x555555}));
+foundation.position.y=0.5;
+scene.add(foundation);
+house.foundation=foundation;
 
-// ==== ТЕКСТУРА ОКОН ====
-function windowTexture(w,h,color){
-  const c=document.createElement('canvas');c.width=256;c.height=256;
-  const ctx=c.getContext('2d');
-  const cr=(color>>16)&255,cg=(color>>8)&255,cb=color&255;
-  ctx.fillStyle=`rgb(${cr},${cg},${cb})`;ctx.fillRect(0,0,256,256);
-  const cols=4,rows=4,pad=12;
-  const ww=(256-pad*(cols+1))/cols,wh=(256-pad*(rows+1))/rows;
-  for(let r=0;r<rows;r++)for(let col=0;col<cols;col++){
-    const lit=Math.random();
-    ctx.fillStyle=lit>.5?'#ffdd88':(lit>.2?'#2a3a4a':'#1a2a3a');
-    const x=pad+col*(ww+pad),y=pad+r*(wh+pad);
-    ctx.fillRect(x,y,ww,wh);
-    // рама окна
-    ctx.strokeStyle='#111';ctx.lineWidth=2;ctx.strokeRect(x,y,ww,wh);
-  }
-  const tex=new THREE.CanvasTexture(c);
-  tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
-  tex.repeat.set(Math.max(1,Math.round(w/6)),Math.max(1,Math.round(h/4)));
-  return tex;
-}
+const wallMat=new THREE.MeshLambertMaterial({color:0xccbb99});
+const wallMat2=new THREE.MeshLambertMaterial({color:0xaa9977});
+const glassMat=new THREE.MeshLambertMaterial({color:0x335577,transparent:true,opacity:.6});
+const doorMat=new THREE.MeshLambertMaterial({color:0x5a3a20});
 
-// ==== ЗДАНИЯ ====
-const buildings=[],FLOOR_H=4;
-const bColors=[0x8899aa,0xaa9988,0x99aabb,0xbbaa99,0xa0a0a0,0xc0b8a8];
-function mkB(x,z,w,d,f,isSchool,isHospital){
-  const g=new THREE.Group();g.position.set(x,0,z);
-  let baseColor=bColors[Math.floor(Math.random()*6)];
-  if(isSchool)baseColor=0xddcc88;
-  if(isHospital)baseColor=0xeeeeee;
-  const fl=[];
-  for(let i=0;i<f;i++){
-    const tex=windowTexture(w,FLOOR_H,baseColor);
-    const m=new THREE.MeshLambertMaterial({map:tex});
-    const p=new THREE.Mesh(new THREE.BoxGeometry(w,FLOOR_H,d),m);
-    p.position.y=i*FLOOR_H+FLOOR_H/2;p.userData={fi:i};g.add(p);fl.push(p);
-    // балконы на каждом 2-м этаже
-    if(i>0&&i%2===0){
-      const balc=new THREE.Mesh(new THREE.BoxGeometry(w*.6,.2,1),
-        new THREE.MeshLambertMaterial({color:0x666666}));
-      balc.position.set(0,i*FLOOR_H+.1,d/2+.5);g.add(balc);
-      const rail=new THREE.Mesh(new THREE.BoxGeometry(w*.6,.8,.1),
-        new THREE.MeshLambertMaterial({color:0x888888}));
-      rail.position.set(0,i*FLOOR_H+.5,d/2+1);g.add(rail);
-    }
-    // кондиционеры
-    if(Math.random()<.4){
-      const ac=new THREE.Mesh(new THREE.BoxGeometry(.8,.6,.5),
-        new THREE.MeshLambertMaterial({color:0xdddddd}));
-      ac.position.set((Math.random()-.5)*w*.7,i*FLOOR_H+FLOOR_H*.6,d/2+.3);
-      g.add(ac);
-    }
-  }
-  // вход на 1 этаже
-  if(f>1){
-    const door=new THREE.Mesh(new THREE.BoxGeometry(2,3,.3),new THREE.MeshLambertMaterial({color:0x333333}));
-    door.position.set(0,1.5,d/2+.16);g.add(door);
-    const canopy=new THREE.Mesh(new THREE.BoxGeometry(4,.3,2),new THREE.MeshLambertMaterial({color:0x555555}));
-    canopy.position.set(0,3.2,d/2+1);g.add(canopy);
-  }
-  // крыша
-  const r=new THREE.Mesh(new THREE.BoxGeometry(w*1.05,.5,d*1.05),new THREE.MeshLambertMaterial({color:0x555555}));
-  r.position.y=f*FLOOR_H;r.userData={fi:f};g.add(r);fl.push(r);
-  // антенна на крыше
-  if(Math.random()<.6){
-    const ant=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,3,4),new THREE.MeshLambertMaterial({color:0x666666}));
-    ant.position.set(0,f*FLOOR_H+2,0);g.add(ant);
-  }
-  // больница
-  if(isHospital){
-    const c1=new THREE.Mesh(new THREE.BoxGeometry(w*.5,.3,.8),new THREE.MeshBasicMaterial({color:0xdd2222}));
-    c1.position.y=f*FLOOR_H+.5;g.add(c1);
-    const c2=new THREE.Mesh(new THREE.BoxGeometry(.8,.3,d*.5),new THREE.MeshBasicMaterial({color:0xdd2222}));
-    c2.position.y=f*FLOOR_H+.5;g.add(c2);
-  }
-  // школа
-  if(isSchool){
-    const pole=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,6,6),new THREE.MeshLambertMaterial({color:0x666666}));
-    pole.position.set(0,f*FLOOR_H+3,0);g.add(pole);
-    const flag=new THREE.Mesh(new THREE.BoxGeometry(2,.3,1.2),new THREE.MeshBasicMaterial({color:0xdd2222}));
-    flag.position.set(1.2,f*FLOOR_H+5.5,0);g.add(flag);
-  }
-  // каркас (колонны, торчат после сноса)
-  const columns=[];
-  for(const cx of[-w/2+.3,w/2-.3])for(const cz of[-d/2+.3,d/2-.3]){
-    const col=new THREE.Mesh(new THREE.BoxGeometry(.4,f*FLOOR_H,.4),
-      new THREE.MeshLambertMaterial({color:0x777777}));
-    col.position.set(cx,f*FLOOR_H/2,cz);col.visible=false;g.add(col);
-  }
-  g.userData={floors:f,floorMeshes:fl,alive:true,width:w,depth:d,destroyed:new Set()};
-  scene.add(g);buildings.push(g);
-}
-for(let gx=-3;gx<=3;gx++)for(let gz=-3;gz<=3;gz++){
-  if(!gx&&!gz)continue;
-  const cx=gx*40,cz=gz*40;
-  if(Math.abs(cz-riverZ)<22)continue;
-  for(let i=0;i<2;i++)mkB(cx+(Math.random()-.5)*18,cz+(Math.random()-.5)*18,8+Math.random()*5,8+Math.random()*5,3+Math.floor(Math.random()*8));
-  if(Math.random()<.3)mkB(cx+(Math.random()-.5)*18,cz+(Math.random()-.5)*18,10,10,12+Math.floor(Math.random()*8));
-}
-mkB(-100,-60,16,14,3,true,false);
-mkB(90,80,16,14,3,true,false);
-mkB(-120,60,18,16,6,false,true);
-mkB(110,-40,18,16,6,false,true);
-
-// ==== ФОНАРИ ====
-const lamps=[],poleMat=new THREE.MeshLambertMaterial({color:0x333333}),lampMat=new THREE.MeshBasicMaterial({color:0xffdd55});
-const poleGeo=new THREE.CylinderGeometry(.3,.3,10,6),headGeo=new THREE.SphereGeometry(.8,8,8);
-function mkLamp(x,z){
+function mkWindow(x,y,z,side){
   const g=new THREE.Group();
-  const p=new THREE.Mesh(poleGeo,poleMat);p.position.y=5;g.add(p);
-  const h=new THREE.Mesh(headGeo,lampMat);h.position.y=10.3;g.add(h);
-  g.position.set(x,0,z);
-  g.userData={falling:false,vel:new THREE.Vector3(),rot:new THREE.Vector3()};
-  scene.add(g);lamps.push(g);
-}
-for(let i=-3;i<=3;i++)for(const z of[15,-15])mkLamp(i*40+15,z);
-
-// ==== МАШИНЫ ====
-const cars=[],wheelGeo=new THREE.CylinderGeometry(.4,.4,.3,8),wheelMat=new THREE.MeshLambertMaterial({color:0x111111});
-const glassMat=new THREE.MeshLambertMaterial({color:0x223344}),lightMat=new THREE.MeshBasicMaterial({color:0xffffaa});
-function mkCar(x,z,rot,color){
-  const g=new THREE.Group(),col=color!==undefined?color:Math.random()*0xffffff;
-  const body=new THREE.Mesh(new THREE.BoxGeometry(2,1,4),new THREE.MeshLambertMaterial({color:col}));
-  body.position.y=.9;g.add(body);
-  const top=new THREE.Mesh(new THREE.BoxGeometry(1.8,.8,2),glassMat);top.position.y=1.8;g.add(top);
-  const roof=new THREE.Mesh(new THREE.BoxGeometry(1.9,.15,2.1),new THREE.MeshLambertMaterial({color:col}));
-  roof.position.y=2.25;g.add(roof);
-  for(const wx of[-1,1])for(const wz of[-1.3,1.3]){
-    const w=new THREE.Mesh(wheelGeo,wheelMat);w.rotation.z=Math.PI/2;w.position.set(wx*.95,.4,wz);g.add(w);
+  const glass=new THREE.Mesh(new THREE.BoxGeometry(1.4,1.8,.05),glassMat);
+  g.add(glass);
+  const fm=new THREE.MeshLambertMaterial({color:0xeeeeee});
+  const t=.1;
+  const parts=[
+    [1.6,t,.08,0,.95,0],[1.6,t,.08,0,-.95,0],
+    [t,1.9,.08,.75,0,0],[t,1.9,.08,-.75,0,0],
+    [.06,1.8,.08,0,0,.01],[1.4,.06,.08,0,0,.01]
+  ];
+  for(const p of parts){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(p[0],p[1],p[2]),fm);
+    m.position.set(p[3],p[4],p[5]);g.add(m);
   }
-  for(const fx of[-.6,.6]){
-    const l=new THREE.Mesh(new THREE.BoxGeometry(.4,.3,.1),lightMat);l.position.set(fx,1,2.05);g.add(l);
-  }
-  g.position.set(x,0,z);g.rotation.y=rot;
-  g.userData={exploded:false,vel:null,bodyColor:col};
-  scene.add(g);cars.push(g);
+  g.position.set(x,y,z);
+  if(side==='e'||side==='w')g.rotation.y=Math.PI/2;
+  scene.add(g);
+  house.windowObjects.push(g);
+  return g;
 }
-for(let i=-3;i<=3;i++)for(let j=0;j<2;j++){
-  const along=Math.random()<.5;
-  const x=along?i*40+(Math.random()-.5)*2:(Math.random()-.5)*80;
-  const z=along?(Math.random()-.5)*80:i*40+(Math.random()-.5)*2;
-  if(Math.abs(z-riverZ)<22)continue;
-  mkCar(x,z,along?0:Math.PI/2);
-}
-mkCar(-128,55,0,0xffffff);mkCar(-130,58,0,0xffffff);
-mkCar(102,-40,0,0xffffff);mkCar(104,-43,0,0xffffff);
 
-// ==== АЗС ====
-const azs=[],tankMat=new THREE.MeshLambertMaterial({color:0xdd3333}),azsMat=new THREE.MeshLambertMaterial({color:0xeeeeee});
-function mkAzs(x,z){
-  const g=new THREE.Group();
-  const roof=new THREE.Mesh(new THREE.BoxGeometry(14,.5,10),azsMat);roof.position.y=6;g.add(roof);
-  for(const cx of[-6,6])for(const cz of[-4,4]){
-    const col=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,6,8),azsMat);
-    col.position.set(cx,3,cz);g.add(col);
-  }
-  for(const px of[-3,3]){
-    const p=new THREE.Mesh(new THREE.BoxGeometry(1.2,2,.8),new THREE.MeshLambertMaterial({color:0xcccccc}));
-    p.position.set(px,1,0);g.add(p);
-  }
-  for(let i=0;i<3;i++){
-    const t=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,4,10),tankMat);
-    t.rotation.z=Math.PI/2;t.position.set(-6+i*2,1.2,8);g.add(t);
-  }
-  g.position.set(x,0,z);g.userData={exploded:false};scene.add(g);azs.push(g);
-}
-mkAzs(30,60);mkAzs(-80,-30);mkAzs(80,-30);
+for(let f=0;f<house.floors;f++){
+  const yBase=f*house.floorHeight+1;
+  const fg=new THREE.Group();
 
-// ==== АЭРОДРОМ ====
-const airportZ=-150;
-const runway=new THREE.Mesh(new THREE.PlaneGeometry(160,16),new THREE.MeshLambertMaterial({color:0x333333}));
-runway.rotation.x=-Math.PI/2;runway.position.set(0,.02,airportZ);scene.add(runway);
-for(let i=-70;i<=70;i+=10){
-  const line=new THREE.Mesh(new THREE.PlaneGeometry(5,.6),new THREE.MeshBasicMaterial({color:0xffffff}));
-  line.rotation.x=-Math.PI/2;line.position.set(i,.03,airportZ);scene.add(line);
-}
-const towerBase=new THREE.Mesh(new THREE.BoxGeometry(4,20,4),new THREE.MeshLambertMaterial({color:0xcccccc}));
-towerBase.position.set(25,10,airportZ+14);scene.add(towerBase);
-const towerTop=new THREE.Mesh(new THREE.BoxGeometry(6,4,6),new THREE.MeshLambertMaterial({color:0x3366aa}));
-towerTop.position.set(25,22,airportZ+14);scene.add(towerTop);
-const hangar=new THREE.Mesh(new THREE.BoxGeometry(22,8,14),new THREE.MeshLambertMaterial({color:0x888888}));
-hangar.position.set(-55,4,airportZ+16);scene.add(hangar);
+  const floor=new THREE.Mesh(new THREE.BoxGeometry(house.width,.3,house.depth),new THREE.MeshLambertMaterial({color:0x888888}));
+  floor.position.y=yBase+.15;fg.add(floor);
 
-// ==== САМОЛЁТЫ НА СТОЯНКЕ ====
-const parkedPlanes=[];
-function mkParkedPlane(x,z,rot){
-  const g=new THREE.Group();
-  const body=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,9,12),new THREE.MeshLambertMaterial({color:0xdddddd}));
-  body.rotation.z=Math.PI/2;g.add(body);
-  const nose=new THREE.Mesh(new THREE.ConeGeometry(.9,2,12),new THREE.MeshLambertMaterial({color:0xdddddd}));
-  nose.rotation.z=-Math.PI/2;nose.position.x=5.5;g.add(nose);
-  const wing=new THREE.Mesh(new THREE.BoxGeometry(3,.3,14),new THREE.MeshLambertMaterial({color:0xcccccc}));
-  wing.position.x=.5;g.add(wing);
-  g.position.set(x,2.5,z);g.rotation.y=rot;
-  g.userData={parked:true,alive:true};
-  scene.add(g);parkedPlanes.push(g);
-}
-mkParkedPlane(-55,airportZ-3,0);
-mkParkedPlane(-55,airportZ+6,0);
-mkParkedPlane(-55,airportZ+16,0);
+  const wallT=.3,wallH=house.floorHeight;
+  const useMat=f%3===0?wallMat2:wallMat;
 
-// ==== ВЕТРЯКИ ====
-const windmills=[];
-function mkWindmill(x,z){
-  const g=new THREE.Group();
-  const pole=new THREE.Mesh(new THREE.CylinderGeometry(.6,.9,30,8),new THREE.MeshLambertMaterial({color:0xeeeeee}));
-  pole.position.y=15;g.add(pole);
-  const hub=new THREE.Mesh(new THREE.SphereGeometry(1.2,10,10),new THREE.MeshLambertMaterial({color:0xcccccc}));
-  hub.position.set(0,30,1);g.add(hub);
-  const blades=[];
-  for(let i=0;i<3;i++){
-    const blade=new THREE.Group();
-    const b=new THREE.Mesh(new THREE.BoxGeometry(.6,14,.2),new THREE.MeshLambertMaterial({color:0xf0f0f0}));
-    b.position.y=7;blade.add(b);
-    blade.rotation.z=(i/3)*Math.PI*2;
-    blade.position.set(0,30,1.3);g.add(blade);blades.push(blade);
+  // 4 стены
+  const wallN=new THREE.Mesh(new THREE.BoxGeometry(house.width,wallH,wallT),useMat);
+  wallN.position.set(0,yBase+wallH/2,-house.depth/2);
+  wallN.userData={type:'wall',floor:f,side:'n'};
+  fg.add(wallN);house.wallObjects.push(wallN);
+
+  const wallS=new THREE.Mesh(new THREE.BoxGeometry(house.width,wallH,wallT),useMat);
+  wallS.position.set(0,yBase+wallH/2,house.depth/2);
+  wallS.userData={type:'wall',floor:f,side:'s'};
+  fg.add(wallS);house.wallObjects.push(wallS);
+
+  const wallW=new THREE.Mesh(new THREE.BoxGeometry(wallT,wallH,house.depth-wallT*2),useMat);
+  wallW.position.set(-house.width/2,yBase+wallH/2,0);
+  wallW.userData={type:'wall',floor:f,side:'w'};
+  fg.add(wallW);house.wallObjects.push(wallW);
+
+  const wallE=new THREE.Mesh(new THREE.BoxGeometry(wallT,wallH,house.depth-wallT*2),useMat);
+  wallE.position.set(house.width/2,yBase+wallH/2,0);
+  wallE.userData={type:'wall',floor:f,side:'e'};
+  fg.add(wallE);house.wallObjects.push(wallE);
+
+  // окна
+  for(let k=-1;k<=1;k++){
+    const wx=k*(house.width/3.5);
+    mkWindow(wx,yBase+wallH*0.6,house.depth/2+.1,'s');
+    mkWindow(wx,yBase+wallH*0.6,-house.depth/2-.1,'n');
   }
-  g.position.set(x,0,z);
-  g.userData={blades,falling:false,vel:new THREE.Vector3(),rot:new THREE.Vector3()};
-  scene.add(g);windmills.push(g);
-}
-mkWindmill(-70,airportZ+30);mkWindmill(-30,airportZ+40);
-mkWindmill(30,airportZ+40);mkWindmill(70,airportZ+30);
 
-// ==== ОБЛОМКИ (куча у основания) ====
-const debris=[],MAX_DEB=250;
+  // вход
+  if(f===0){
+    const door=new THREE.Mesh(new THREE.BoxGeometry(2,2.5,.2),doorMat);
+    door.position.set(0,yBase+1.25,house.depth/2+.15);
+    fg.add(door);
+    const canopy=new THREE.Mesh(new THREE.BoxGeometry(4,.3,2),new THREE.MeshLambertMaterial({color:0x444444}));
+    canopy.position.set(0,yBase+2.8,house.depth/2+1);
+    fg.add(canopy);
+  }
+
+  // балконы
+  if(f>0&&f%3===0){
+    const balc=new THREE.Mesh(new THREE.BoxGeometry(house.width*.5,.2,1.5),new THREE.MeshLambertMaterial({color:0x777777}));
+    balc.position.set(0,yBase+0.1,house.depth/2+0.75);fg.add(balc);
+    const rail=new THREE.Mesh(new THREE.BoxGeometry(house.width*.5,1,.1),new THREE.MeshLambertMaterial({color:0x555555}));
+    rail.position.set(0,yBase+0.6,house.depth/2+1.5);fg.add(rail);
+  }
+
+  scene.add(fg);
+  house.floorObjects.push(fg);
+  fg.userData={floor:f,yBase:yBase};
+}
+
+const roofY=house.floors*house.floorHeight+1;
+const roof=new THREE.Mesh(new THREE.BoxGeometry(house.width+1,.5,house.depth+1),new THREE.MeshLambertMaterial({color:0x444444}));
+roof.position.y=roofY+.25;
+scene.add(roof);
+house.roof=roof;
+
+const antenna=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,5,4),new THREE.MeshLambertMaterial({color:0x888888}));
+antenna.position.set(house.width/2-2,roofY+2.5,0);
+scene.add(antenna);
+
+const basement=new THREE.Mesh(new THREE.BoxGeometry(house.width-2,1.5,house.depth-2),new THREE.MeshLambertMaterial({color:0x333333}));
+basement.position.y=-0.5;
+scene.add(basement);
+
+const porch=new THREE.Mesh(new THREE.BoxGeometry(6,.4,3),new THREE.MeshLambertMaterial({color:0xaaaaaa}));
+porch.position.set(0,.2,house.depth/2+1.5);
+scene.add(porch);
+
+// кусты
+function mkBush(x,z){
+  const b=new THREE.Mesh(new THREE.SphereGeometry(.8,6,6),new THREE.MeshLambertMaterial({color:0x2a5a2a}));
+  b.position.set(x,.4,z);scene.add(b);
+}
+mkBush(-10,8);mkBush(10,8);mkBush(-10,-8);mkBush(10,-8);
+
+// забор
+const fenceMat=new THREE.MeshLambertMaterial({color:0x8a6a3a});
+for(let i=-22;i<=22;i+=2){
+  if(Math.abs(i)<6)continue;
+  const p=new THREE.Mesh(new THREE.BoxGeometry(.15,1.5,.15),fenceMat);
+  p.position.set(i,.75,house.depth/2+3);scene.add(p);
+}
+for(const z of[-22,22]){
+  for(let i=-20;i<=20;i+=2){
+    const p=new THREE.Mesh(new THREE.BoxGeometry(.15,1.5,.15),fenceMat);
+    p.position.set(z,.75,i);scene.add(p);
+  }
+}
+
+// ============ СОСТОЯНИЕ ============
+const state={
+  tool:'bomb',camTheta:Math.PI/4,camPhi:Math.PI/3,camDist:80,
+  camTarget:new THREE.Vector3(0,house.floors*house.floorHeight/2,0),
+  destroyedParts:0,totalParts:house.wallObjects.length+house.windowObjects.length+2,
+  score:0
+};
+
+// ============ ОБЛОМКИ ============
+const debris=[];
+const MAX_DEBRIS=300;
+const debrisGeo=new THREE.BoxGeometry(1,1,1);
+
 function spawnDebris(pos,mat,size,force){
-  if(debris.length>=MAX_DEB){const o=debris.shift();scene.remove(o.mesh);}
-  // обломки падают вниз, скапливаются
-  const p=new THREE.Mesh(new THREE.BoxGeometry(size.x*(.5+Math.random()*.4),size.y*(.5+Math.random()*.4),size.z*(.5+Math.random()*.4)),mat);
-  p.position.copy(pos);scene.add(p);
+  if(debris.length>=MAX_DEBRIS){
+    const old=debris.shift();
+    scene.remove(old.mesh);
+  }
+  const p=new THREE.Mesh(debrisGeo,mat);
+  p.scale.set(size.x*(0.4+Math.random()*0.5),size.y*(0.4+Math.random()*0.5),size.z*(0.4+Math.random()*0.5));
+  p.position.copy(pos);
+  scene.add(p);
   debris.push({
     mesh:p,
-    vel:new THREE.Vector3((Math.random()-.5)*force,Math.random()*force*.7+2,(Math.random()-.5)*force),
+    vel:new THREE.Vector3((Math.random()-.5)*force,Math.random()*force*0.7+2,(Math.random()-.5)*force),
     rot:new THREE.Vector3((Math.random()-.5)*6,(Math.random()-.5)*6,(Math.random()-.5)*6),
-    life:90,resting:false
+    life:120,material:mat,isBig:false
   });
 }
 
-// ==== ОБРУШЕНИЕ ====
-const collapseQ=[];
-function destroyFloor(b,fi){
-  const d=b.userData;if(!d.alive)return;
-  const top=d.floorMeshes.length-1;
-  const start=Math.max(0,Math.min(fi,top));
-  for(let i=top;i>=start;i--){
-    if(d.destroyed.has(i))continue;
-    collapseQ.push({b,fi:i,time:(top-i)*.1});
-  }
-}
-function processQ(dt){
-  for(let i=collapseQ.length-1;i>=0;i--){
-    const c=collapseQ[i];c.time-=dt;if(c.time>0)continue;
-    const d=c.b.userData,fi=c.fi;
-    if(d.destroyed.has(fi)){collapseQ.splice(i,1);continue;}
-    const m=d.floorMeshes[fi];
-    if(!m||!m.parent){collapseQ.splice(i,1);continue;}
-    d.destroyed.add(fi);
-    const wp=new THREE.Vector3();m.getWorldPosition(wp);
-    const bb=new THREE.Box3().setFromObject(m),sz=new THREE.Vector3();bb.getSize(sz);
-    const pc=4+Math.floor(Math.random()*3);
-    for(let p=0;p<pc;p++){
-      const pos=wp.clone();
-      pos.x+=(Math.random()-.5)*sz.x*.7;
-      pos.y+=(Math.random()-.5)*sz.y*.5;
-      pos.z+=(Math.random()-.5)*sz.z*.7;
-      spawnDebris(pos,m.material,new THREE.Vector3(sz.x*.5,sz.y*.5,sz.z*.5),8);
-    }
-    for(let k=0;k<4;k++){
-      const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0xaaaaaa,transparent:true,opacity:.5}));
-      sm.position.copy(wp);
-      sm.position.x+=(Math.random()-.5)*sz.x;sm.position.z+=(Math.random()-.5)*sz.z;
-      sm.scale.setScalar(1.5+Math.random());scene.add(sm);
-      fx.push({mesh:sm,life:2.5,max:2.5,targetR:5,type:'smoke',vel:new THREE.Vector3((Math.random()-.5),.5+Math.random()*.5,(Math.random()-.5))});
-    }
-    m.parent.remove(m);collapseQ.splice(i,1);
-    if(d.destroyed.size>=d.floorMeshes.length)d.alive=false;
-  }
-}
-
-// ==== ЭФФЕКТЫ ====
-const fx=[],expGeo=new THREE.SphereGeometry(1,10,10),smokeGeo=new THREE.SphereGeometry(1,6,6),fireGeo=new THREE.SphereGeometry(1,6,6);
-
-// ==== ОГОНЬ ====
+// ============ ОГОНЬ ============
 const fires=[];
-function igniteBuilding(b){
-  const d=b.userData;if(!d.alive||d.onFire)return;
-  d.onFire=true;
-  const firePositions=[];
-  for(let i=0;i<d.floorMeshes.length;i++){
-    if(!d.floorMeshes[i].parent)continue;
-    const p=new THREE.Vector3();d.floorMeshes[i].getWorldPosition(p);
-    firePositions.push({pos:p,floor:i});
-    // огонь на этаже
-    const f=new THREE.Mesh(fireGeo,new THREE.MeshBasicMaterial({color:0xff5500,transparent:true,opacity:.9}));
-    f.position.copy(p);f.position.y+=FLOOR_H*.3;f.scale.setScalar(2+Math.random());
-    scene.add(f);
-    fx.push({mesh:f,life:8,max:8,targetR:3,type:'fire'});
-  }
-  fires.push({building:b,time:8+Math.random()*4,positions:firePositions});
-  // через 3 сек перекидываемся на соседнее здание
-  setTimeout(()=>{
-    for(const other of buildings){
-      if(other===b||other.userData.onFire||!other.userData.alive)continue;
-      const dd=Math.hypot(other.position.x-b.position.x,other.position.z-b.position.z);
-      if(dd<30&&Math.random()<.5)igniteBuilding(other);
-    }
-  },3000);
-  // этажи постепенно сгорают
-  let idx=0;
-  const burnInt=setInterval(()=>{
-    if(idx>=firePositions.length){clearInterval(burnInt);return;}
-    const fp=firePositions[idx];
-    if(!d.destroyed.has(fp.floor)){
-      collapseQ.push({b,fi:fp.floor,time:0});
-    }
-    idx++;
-  },1000);
+const fireGeo=new THREE.SphereGeometry(1,6,6);
+function ignite(pos){
+  const f=new THREE.Mesh(fireGeo,new THREE.MeshBasicMaterial({color:0xff5500,transparent:true,opacity:.9}));
+  f.position.copy(pos);
+  f.scale.setScalar(1.5+Math.random());
+  scene.add(f);
+  fires.push({mesh:f,life:15,maxLife:15,spreadTimer:1.5});
 }
 function updateFires(dt){
   for(let i=fires.length-1;i>=0;i--){
-    const f=fires[i];f.time-=dt;
-    if(f.time<=0){fires.splice(i,1);}
-  }
-}
-
-// ==== МОЛНИЯ ====
-function strikeLightning(pos){
-  // линия с неба
-  const points=[new THREE.Vector3(pos.x,300,pos.z),new THREE.Vector3(pos.x,pos.y,pos.z)];
-  const geo=new THREE.BufferGeometry().setFromPoints(points);
-  const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xaaccff,linewidth:3}));
-  scene.add(line);
-  setTimeout(()=>scene.remove(line),200);
-  // вспышка
-  const fl=document.getElementById('flash');
-  fl.style.transition='none';fl.style.opacity='1';
-  setTimeout(()=>{fl.style.transition='opacity .3s';fl.style.opacity='0';},50);
-  explode(pos,15,20,false);
-}
-
-// ==== КЛАСТЕРНАЯ БОМБА ====
-function dropCluster(pos){
-  explode(pos,18,20,false);
-  for(let i=0;i<8;i++){
-    const a=Math.random()*Math.PI*2,r=8+Math.random()*12;
-    const p=new THREE.Vector3(pos.x+Math.cos(a)*r,pos.y+Math.random()*5,pos.z+Math.sin(a)*r);
-    setTimeout(()=>explode(p,10,12,false),100+i*80);
-  }
-}
-
-// ==== ВЕРТОЛЁТ ====
-const helis=[];
-function spawnHeli(){
-  const g=new THREE.Group();
-  const body=new THREE.Mesh(new THREE.BoxGeometry(6,2.5,2.5),new THREE.MeshLambertMaterial({color:0x556644}));
-  g.add(body);
-  const tail=new THREE.Mesh(new THREE.BoxGeometry(4,.5,.5),new THREE.MeshLambertMaterial({color:0x556644}));
-  tail.position.set(-4.5,.8,0);g.add(tail);
-  const rotor=new THREE.Mesh(new THREE.BoxGeometry(.3,.1,10),new THREE.MeshLambertMaterial({color:0x333333}));
-  rotor.position.y=2;g.add(rotor);
-  const tailRotor=new THREE.Mesh(new THREE.BoxGeometry(.2,1.5,.1),new THREE.MeshLambertMaterial({color:0x333333}));
-  tailRotor.position.set(-6.5,1,0);g.add(tailRotor);
-  g.position.set(Math.random()*100-50,50,Math.random()*100-50);
-  scene.add(g);
-  helis.push({mesh:g,rotor,fireCd:0,target:null,life:30});
-}
-function updateHelis(dt){
-  for(let i=helis.length-1;i>=0;i--){
-    const h=helis[i];h.life-=dt;h.rotor.rotation.y+=15*dt;
-    // выбрать цель
-    if(!h.target||!h.target.userData.alive){
-      const alive=buildings.filter(b=>b.userData.alive);
-      if(alive.length)h.target=alive[Math.floor(Math.random()*alive.length)];
-    }
-    if(h.target){
-      const tp=new THREE.Vector3(h.target.position.x,40,h.target.position.z);
-      const dir=tp.clone().sub(h.mesh.position);
-      if(dir.length()>2)h.mesh.position.addScaledVector(dir.normalize(),15*dt);
-      // стрелять
-      h.fireCd-=dt;
-      if(h.fireCd<=0){
-        h.fireCd=1.2;
-        const from=h.mesh.position.clone();
-        const to=new THREE.Vector3(h.target.position.x,(Math.random()*.6+.5)*h.target.userData.floors*FLOOR_H,h.target.position.z);
-        launchRocket(from,to);
+    const f=fires[i];
+    f.life-=dt;
+    f.mesh.scale.setScalar(1.5+Math.random()*0.5);
+    f.mesh.material.opacity=Math.min(0.9,f.life/5);
+    f.spreadTimer-=dt;
+    if(f.spreadTimer<=0&&f.life>5){
+      f.spreadTimer=2+Math.random();
+      for(const wall of house.wallObjects){
+        if(wall.userData.destroyed||wall.userData.onFire)continue;
+        const wp=new THREE.Vector3();
+        wall.getWorldPosition(wp);
+        if(wp.distanceTo(f.mesh.position)<6){
+          wall.userData.onFire=true;
+          ignite(wp);
+        }
       }
     }
-    if(h.life<=0){scene.remove(h.mesh);helis.splice(i,1);}
+    if(f.life<=0){scene.remove(f.mesh);fires.splice(i,1);}
+  }
+}
+function extinguish(pos,radius){
+  for(let i=fires.length-1;i>=0;i--){
+    const f=fires[i];
+    if(f.mesh.position.distanceTo(pos)<radius){scene.remove(f.mesh);fires.splice(i,1);}
+  }
+  for(const wall of house.wallObjects){
+    const wp=new THREE.Vector3();
+    wall.getWorldPosition(wp);
+    if(wp.distanceTo(pos)<radius)wall.userData.onFire=false;
   }
 }
 
-// ==== ТОРНАДО ====
-let tornado=null;
-function spawnTornado(){
-  if(tornado){scene.remove(tornado.mesh);}
-  const g=new THREE.Group();
-  for(let i=0;i<10;i++){
-    const r=1+i*.8;
-    const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.8,6,12),new THREE.MeshLambertMaterial({color:0x888899,transparent:true,opacity:.5}));
-    ring.rotation.x=Math.PI/2;ring.position.y=i*2.5;g.add(ring);
-  }
-  g.position.set(Math.random()*100-50,0,Math.random()*100-50);
-  scene.add(g);
-  tornado={mesh:g,life:20,dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize()};
-}
-function updateTornado(dt){
-  if(!tornado)return;
-  tornado.life-=dt;
-  tornado.mesh.position.addScaledVector(tornado.dir,8*dt);
-  tornado.mesh.rotation.y+=5*dt;
-  // втягивает машины и фонари
-  const tp=tornado.mesh.position;
-  for(const car of cars){
-    if(car.userData.exploded)continue;
-    const dx=tp.x-car.position.x,dz=tp.z-car.position.z;
-    const dd=Math.hypot(dx,dz);
-    if(dd<15){
-      car.userData.vel=car.userData.vel||new THREE.Vector3();
-      car.userData.vel.x-=dx*0.3;car.userData.vel.z-=dz*0.3;car.userData.vel.y+=10;
-    }
-  }
-  for(const lamp of lamps){
-    if(lamp.userData.falling)continue;
-    const dx=tp.x-lamp.position.x,dz=tp.z-lamp.position.z;
-    if(Math.hypot(dx,dz)<12){
-      lamp.userData.falling=true;
-      lamp.userData.vel.set(-dx*.5,5,-dz*.5);
-      lamp.userData.rot.set((Math.random()-.5)*5,(Math.random()-.5)*5,(Math.random()-.5)*5);
-    }
-  }
-  if(tornado.life<=0){scene.remove(tornado.mesh);tornado=null;}
-}
+// ============ ЭФФЕКТЫ ============
+const effects=[];
+const expGeo=new THREE.SphereGeometry(1,10,10);
+const smokeGeo=new THREE.SphereGeometry(1,6,6);
 
-// ==== ЦУНАМИ ====
-let tsunami=null;
-function spawnTsunami(){
-  if(tsunami){scene.remove(tsunami.mesh);}
-  const w=new THREE.Mesh(new THREE.BoxGeometry(400,10,20),new THREE.MeshLambertMaterial({color:0x3a7ea8,transparent:true,opacity:.85}));
-  w.position.set(0,5,riverZ);
-  scene.add(w);
-  tsunami={mesh:w,life:15};
-}
-function updateTsunami(dt){
-  if(!tsunami)return;
-  tsunami.life-=dt;
-  // волна движется на север
-  tsunami.mesh.position.z+=15*dt;
-  const wp=tsunami.mesh.position;
-  // смывает объекты в полосе
-  for(const car of cars){
-    if(car.userData.exploded)continue;
-    if(Math.abs(car.position.z-wp.z)<20&&Math.abs(car.position.x-wp.x)<200){
-      car.userData.vel=car.userData.vel||new THREE.Vector3();
-      car.userData.vel.z+=15;car.userData.vel.y+=5;
-    }
-  }
-  for(const b of buildings){
-    if(!b.userData.alive)continue;
-    if(Math.abs(b.position.z-wp.z)<15&&Math.abs(b.position.x-wp.x)<200){
-      // нижние 2 этажа
-      destroyFloor(b,0);
-    }
-  }
-  if(tsunami.life<=0){scene.remove(tsunami.mesh);tsunami=null;}
-}
-
-// ==== ЗЕМЛЕТРЯСЕНИЕ ====
-let quake=null;
-function spawnQuake(){
-  quake={life:8,shake:0};
-}
-function updateQuake(dt){
-  if(!quake)return;
-  quake.life-=dt;
-  quake.shake=Math.sin(Date.now()*.05)*.5;
-  // случайные обвалы
-  if(Math.random()<.15){
-    const alive=buildings.filter(b=>b.userData.alive);
-    if(alive.length){
-      const b=alive[Math.floor(Math.random()*alive.length)];
-      const fi=Math.floor(Math.random()*b.userData.floors);
-      collapseQ.push({b,fi,time:0});
-    }
-  }
-  if(quake.life<=0)quake=null;
-}
-
-// ==== ВЗРЫВЫ ====
 function explode(pos,radius,power,isNuke){
   const fireColor=isNuke?0xffffee:0xffaa33;
   const m=new THREE.MeshBasicMaterial({color:fireColor,transparent:true,opacity:.95});
-  const s=new THREE.Mesh(expGeo,m);s.position.copy(pos);scene.add(s);
-  fx.push({mesh:s,life:isNuke?1.2:.5,max:isNuke?1.2:.5,targetR:radius,type:'fireball'});
+  const s=new THREE.Mesh(expGeo,m);
+  s.position.copy(pos);scene.add(s);
+  effects.push({mesh:s,life:isNuke?1.2:.5,max:isNuke?1.2:.5,targetR:radius,type:'fireball'});
+
   const smCount=isNuke?12:5;
   for(let i=0;i<smCount;i++){
-    const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:isNuke?0x111111:0x333333,transparent:true,opacity:.6}));
-    sm.position.copy(pos);sm.position.x+=(Math.random()-.5)*6;sm.position.y+=Math.random()*4;sm.position.z+=(Math.random()-.5)*6;
-    sm.scale.setScalar(2+Math.random()*2);scene.add(sm);
-    fx.push({mesh:sm,life:isNuke?5:2.5,max:isNuke?5:2.5,targetR:radius*(isNuke?1:.7),type:'smoke',vel:new THREE.Vector3((Math.random()-.5)*2,1+Math.random()*2,(Math.random()-.5)*2)});
+    const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:isNuke?0x111111:0x555555,transparent:true,opacity:.6}));
+    sm.position.copy(pos);
+    sm.position.x+=(Math.random()-.5)*6;
+    sm.position.y+=Math.random()*4;
+    sm.position.z+=(Math.random()-.5)*6;
+    sm.scale.setScalar(2+Math.random()*2);
+    scene.add(sm);
+    effects.push({mesh:sm,life:isNuke?6:3,max:isNuke?6:3,targetR:radius*(isNuke?1:.7),type:'smoke',vel:new THREE.Vector3((Math.random()-.5)*2,1+Math.random()*2,(Math.random()-.5)*2)});
   }
+
   if(isNuke){
     const stem=new THREE.Mesh(new THREE.CylinderGeometry(radius*.3,radius*.5,radius*1.5,12,1,true),
       new THREE.MeshBasicMaterial({color:0xffddaa,transparent:true,opacity:.7,side:THREE.DoubleSide}));
     stem.position.copy(pos);stem.position.y+=radius*.75;scene.add(stem);
-    fx.push({mesh:stem,life:3,max:3,targetR:1,type:'stem'});
+    effects.push({mesh:stem,life:4,max:4,targetR:1,type:'stem'});
     const cap=new THREE.Mesh(expGeo,new THREE.MeshBasicMaterial({color:0xffcc88,transparent:true,opacity:.7}));
     cap.position.copy(pos);cap.position.y+=radius*1.5;scene.add(cap);
-    fx.push({mesh:cap,life:3,max:3,targetR:radius*1.5,type:'cap'});
-    const fl=document.getElementById('flash');
-    fl.style.transition='none';fl.style.opacity='1';
-    setTimeout(()=>{fl.style.transition='opacity 1.5s';fl.style.opacity='0';},50);
+    effects.push({mesh:cap,life:4,max:4,targetR:radius*1.5,type:'cap'});
   }
-  const light=new THREE.PointLight(fireColor,isNuke?800:300,radius*6);
+
+  const light=new THREE.PointLight(fireColor,isNuke?1000:400,radius*6);
   light.position.copy(pos);scene.add(light);
-  fx.push({light,life:isNuke?.8:.35,max:isNuke?.8:.35});
-  checkCrater(pos,radius);
-  for(const b of buildings){
-    const d=b.userData;if(!d.alive)continue;
-    const dd=Math.hypot(b.position.x-pos.x,b.position.z-pos.z);
-    if(dd>radius+Math.max(d.width,d.depth))continue;
-    let hf=pos.y<5?0:Math.floor((pos.y-b.position.y)/FLOOR_H);
-    hf=Math.max(0,Math.min(hf,d.floors-1));
-    destroyFloor(b,hf);
-  }
-  for(const pp of parkedPlanes){
-    if(!pp.userData.alive)continue;
-    const dd=Math.hypot(pp.position.x-pos.x,pp.position.z-pos.z);
-    if(dd<radius+5){
-      pp.userData.alive=false;
-      for(const child of [...pp.children]){
-        const cwp=new THREE.Vector3();child.getWorldPosition(cwp);
-        for(let k=0;k<3;k++)spawnDebris(cwp,child.material||new THREE.MeshLambertMaterial({color:0xaaaaaa}),new THREE.Vector3(1,1,1),15);
-      }
-      scene.remove(pp);
+  effects.push({light,life:isNuke?.8:.4,max:isNuke?.8:.4});
+
+  // разрушение стен
+  for(const wall of house.wallObjects){
+    if(wall.userData.destroyed)continue;
+    const wp=new THREE.Vector3();
+    wall.getWorldPosition(wp);
+    const bb=new THREE.Box3().setFromObject(wall);
+    const sz=new THREE.Vector3();bb.getSize(sz);
+    if(wp.distanceTo(pos)<radius+Math.max(sz.x,sz.z)){
+      destroyWall(wall,wp,sz,power);
     }
   }
-  for(const part of bridgeParts){
-    if(!part.parent)continue;
-    const wp=new THREE.Vector3();part.getWorldPosition(wp);
-    if(Math.hypot(wp.x-pos.x,wp.z-pos.z)<radius+5){
-      for(let p=0;p<8;p++)spawnDebris(wp,part.material,new THREE.Vector3(10,.8,4.5),18);
-      part.parent.remove(part);
+
+  // окна
+  for(const win of house.windowObjects){
+    if(win.userData.destroyed)continue;
+    const wp=new THREE.Vector3();
+    win.getWorldPosition(wp);
+    if(wp.distanceTo(pos)<radius+1){
+      win.userData.destroyed=true;
+      for(let k=0;k<5;k++)spawnDebris(wp,glassMat,new THREE.Vector3(.3,.3,.3),10);
+      scene.remove(win);
+      state.destroyedParts++;state.score+=5;
     }
   }
-  for(const a of azs){
-    if(a.userData.exploded)continue;
-    const dd=Math.hypot(a.position.x-pos.x,a.position.z-pos.z);
-    if(dd<radius+6){
-      a.userData.exploded=true;
-      const ap=a.position.clone();ap.y=2;
-      scene.remove(a);
-      setTimeout(()=>explode(ap,28,40,false),150);
-    }
+
+  // крыша
+  if(house.roof&&!house.roof.userData.destroyed){
+    const wp=new THREE.Vector3();
+    house.roof.getWorldPosition(wp);
+    if(wp.distanceTo(pos)<radius+8)destroyRoof();
   }
-  for(const lamp of lamps){
-    if(lamp.userData.falling)continue;
-    const dd=Math.hypot(lamp.position.x-pos.x,lamp.position.z-pos.z);
-    if(dd<radius){
-      lamp.userData.falling=true;
-      const dx=lamp.position.x-pos.x,dz=lamp.position.z-pos.z,dist=Math.hypot(dx,dz)||1;
-      const f=(1-dd/radius)*power*.3;
-      lamp.userData.vel.set(dx/dist*f,3+Math.random()*2,dz/dist*f);
-      lamp.userData.rot.set((Math.random()-.5)*4,(Math.random()-.5)*4,(Math.random()-.5)*4);
-    }
+
+  if(isNuke&&house.foundation&&!house.foundation.userData.destroyed){
+    const wp=new THREE.Vector3();
+    house.foundation.getWorldPosition(wp);
+    if(wp.distanceTo(pos)<radius+5)destroyFoundation();
   }
-  for(const w of windmills){
-    if(w.userData.falling)continue;
-    const dd=Math.hypot(w.position.x-pos.x,w.position.z-pos.z);
-    if(dd<radius+10){
-      w.userData.falling=true;
-      const dx=w.position.x-pos.x,dz=w.position.z-pos.z,dist=Math.hypot(dx,dz)||1;
-      const f=(1-dd/(radius+10))*power*.5;
-      w.userData.vel.set(dx/dist*f,3+Math.random()*3,dz/dist*f);
-      w.userData.rot.set((Math.random()-.5)*3,(Math.random()-.5)*3,(Math.random()-.5)*3);
-      for(const bl of w.userData.blades){
-        if(Math.random()<.7){
-          const wp=new THREE.Vector3();bl.getWorldPosition(wp);
-          const bm=bl.children[0];
-          if(bm){
-            for(let k=0;k<3;k++)spawnDebris(wp,bm.material,new THREE.Vector3(1,4,.3),15);
-            bl.remove(bm);
-          }
-        }
-      }
-    }
-  }
-  for(const car of cars){
-    if(car.userData.exploded)continue;
-    const dx=car.position.x-pos.x,dz=car.position.z-pos.z,dist=Math.hypot(dx,dz);
-    if(dist<radius){
-      const f=(1-dist/radius)*power;
-      car.userData.vel=car.userData.vel||new THREE.Vector3();
-      car.userData.vel.x+=(dx/(dist||1))*f;car.userData.vel.z+=(dz/(dist||1))*f;car.userData.vel.y+=f*.6;
-      if(dist<radius*0.7){
-        car.userData.exploded=true;
-        const cp=car.position.clone();cp.y=1;
-        const fs=new THREE.Mesh(expGeo,new THREE.MeshBasicMaterial({color:0xff8833,transparent:true,opacity:.95}));
-        fs.position.copy(cp);scene.add(fs);
-        fx.push({mesh:fs,life:.8,max:.8,targetR:8,type:'fireball'});
-        const cm=new THREE.MeshLambertMaterial({color:car.userData.bodyColor});
-        for(let k=0;k<8;k++)spawnDebris(cp,cm,new THREE.Vector3(1,1,1),18);
-        scene.remove(car);
-      }
-    }
-  }
-  // поджигаем близкие здания при ядерном или большом взрыве
-  if(isNuke||radius>25){
-    for(const b of buildings){
-      const dd=Math.hypot(b.position.x-pos.x,b.position.z-pos.z);
-      if(dd<radius*0.7&&Math.random()<.6)igniteBuilding(b);
+
+  // огонь
+  for(const wall of house.wallObjects){
+    if(wall.userData.destroyed)continue;
+    const wp=new THREE.Vector3();
+    wall.getWorldPosition(wp);
+    if(wp.distanceTo(pos)<radius&&Math.random()<.5){
+      wall.userData.onFire=true;
+      ignite(wp);
     }
   }
 }
 
-// ==== РАКЕТЫ ====
+// ============ РАЗРУШЕНИЕ СТЕН (КРУПНЫЕ КУСКИ) ============
+function destroyWall(wall,wp,sz,power){
+  if(wall.userData.destroyed)return;
+  wall.userData.destroyed=true;
+
+  // 2-3 крупных фрагмента
+  const bigPieces=2+Math.floor(Math.random()*2);
+  for(let p=0;p<bigPieces;p++){
+    const pos=wp.clone();
+    pos.x+=(Math.random()-.5)*sz.x*0.7;
+    pos.y+=(Math.random()-.5)*sz.y*0.7;
+    pos.z+=(Math.random()-.5)*sz.z*0.7;
+
+    const bigSize=new THREE.Vector3(
+      sz.x*(0.5+Math.random()*0.3),
+      sz.y*(0.5+Math.random()*0.3),
+      sz.z*(0.5+Math.random()*0.3)
+    );
+
+    const mesh=new THREE.Mesh(debrisGeo,wall.material);
+    mesh.scale.copy(bigSize);
+    mesh.position.copy(pos);
+    scene.add(mesh);
+
+    debris.push({
+      mesh:mesh,
+      vel:new THREE.Vector3(
+        (Math.random()-.5)*power*0.4,
+        Math.random()*3+0.5,
+        (Math.random()-.5)*power*0.4
+      ),
+      rot:new THREE.Vector3(
+        (Math.random()-.5)*3,
+        (Math.random()-.5)*3,
+        (Math.random()-.5)*3
+      ),
+      life:150,
+      material:wall.material,
+      isBig:true,
+      size:bigSize.clone(),
+      broken:false
+    });
+  }
+
+  wall.parent.remove(wall);
+  state.destroyedParts++;state.score+=15;
+
+  // пыль
+  for(let k=0;k<3;k++){
+    const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0xaaaaaa,transparent:true,opacity:.5}));
+    sm.position.copy(wp);
+    sm.position.x+=(Math.random()-.5)*sz.x;
+    sm.position.z+=(Math.random()-.5)*sz.z;
+    sm.scale.setScalar(2);
+    scene.add(sm);
+    effects.push({mesh:sm,life:2.5,max:2.5,targetR:5,type:'smoke',vel:new THREE.Vector3((Math.random()-.5),.5+Math.random()*.5,(Math.random()-.5))});
+  }
+
+  checkFloorCollapse(wall.userData.floor);
+}
+
+function checkFloorCollapse(floorIndex){
+  const floorWalls=house.wallObjects.filter(w=>w.userData.floor===floorIndex&&!w.userData.destroyed);
+  if(floorWalls.length<=2)tiltFloor(floorIndex);
+}
+
+// ЭТАЖ НАКЛОНЯЕТСЯ
+function tiltFloor(floorIndex){
+  const fg=house.floorObjects[floorIndex];
+  if(!fg||fg.userData.tilting||fg.userData.collapsed)return;
+  fg.userData.tilting=true;
+
+  const tiltX=(Math.random()-.5)*0.5;
+  const tiltZ=(Math.random()-.5)*0.5;
+  const startTime=performance.now();
+  const duration=1500;
+
+  const interval=setInterval(()=>{
+    const t=Math.min(1,(performance.now()-startTime)/duration);
+    fg.rotation.x=tiltX*t;
+    fg.rotation.z=tiltZ*t;
+    fg.position.y=-t*t*1.5;
+    if(t>=1){
+      clearInterval(interval);
+      setTimeout(()=>collapseFloor(floorIndex),300);
+    }
+  },30);
+}
+
+// ЭТАЖ ПАДАЕТ
+function collapseFloor(floorIndex){
+  const fg=house.floorObjects[floorIndex];
+  if(!fg||fg.userData.collapsed)return;
+  fg.userData.collapsed=true;
+
+  for(const wall of [...house.wallObjects]){
+    if(wall.userData.floor!==floorIndex)continue;
+    if(wall.userData.destroyed)continue;
+    wall.userData.destroyed=true;
+    const wp=new THREE.Vector3();
+    wall.getWorldPosition(wp);
+    const bb=new THREE.Box3().setFromObject(wall);
+    const sz=new THREE.Vector3();bb.getSize(sz);
+
+    for(let p=0;p<3;p++){
+      const pos=wp.clone();
+      pos.x+=(Math.random()-.5)*sz.x*0.7;
+      pos.y+=(Math.random()-.5)*sz.y*0.7;
+      pos.z+=(Math.random()-.5)*sz.z*0.7;
+
+      const bigSize=new THREE.Vector3(
+        sz.x*(0.5+Math.random()*0.3),
+        sz.y*(0.5+Math.random()*0.3),
+        sz.z*(0.5+Math.random()*0.3)
+      );
+      const mesh=new THREE.Mesh(debrisGeo,wall.material);
+      mesh.scale.copy(bigSize);
+      mesh.position.copy(pos);
+      scene.add(mesh);
+      debris.push({
+        mesh:mesh,
+        vel:new THREE.Vector3((Math.random()-.5)*4,Math.random()*2,(Math.random()-.5)*4),
+        rot:new THREE.Vector3((Math.random()-.5)*3,(Math.random()-.5)*3,(Math.random()-.5)*3),
+        life:150,material:wall.material,isBig:true,size:bigSize.clone(),broken:false
+      });
+    }
+    wall.parent.remove(wall);
+    state.destroyedParts++;state.score+=10;
+  }
+
+  if(fg.parent)fg.parent.remove(fg);
+
+  // пыль
+  for(let k=0;k<6;k++){
+    const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0xaaaaaa,transparent:true,opacity:.6}));
+    sm.position.set((Math.random()-.5)*house.width,floorIndex*house.floorHeight+1,(Math.random()-.5)*house.depth);
+    sm.scale.setScalar(3);
+    scene.add(sm);
+    effects.push({mesh:sm,life:3,max:3,targetR:8,type:'smoke',vel:new THREE.Vector3((Math.random()-.5)*2,1+Math.random(),(Math.random()-.5)*2)});
+  }
+
+  // каскад — верхние этажи
+  for(let f=floorIndex+1;f<house.floors;f++){
+    setTimeout(()=>tiltFloor(f),300+(f-floorIndex-1)*200);
+  }
+}
+
+function destroyRoof(){
+  if(house.roof.userData.destroyed)return;
+  house.roof.userData.destroyed=true;
+  const wp=new THREE.Vector3();
+  house.roof.getWorldPosition(wp);
+  const bb=new THREE.Box3().setFromObject(house.roof);
+  const sz=new THREE.Vector3();bb.getSize(sz);
+  for(let p=0;p<8;p++)spawnDebris(wp,house.roof.material,sz,10);
+  scene.remove(house.roof);
+  state.destroyedParts++;state.score+=30;
+  if(house.antenna){scene.remove(house.antenna);house.antenna=null;}
+}
+
+function destroyFoundation(){
+  if(house.foundation.userData.destroyed)return;
+  house.foundation.userData.destroyed=true;
+  const wp=new THREE.Vector3();
+  house.foundation.getWorldPosition(wp);
+  const bb=new THREE.Box3().setFromObject(house.foundation);
+  const sz=new THREE.Vector3();bb.getSize(sz);
+  for(let p=0;p<10;p++)spawnDebris(wp,house.foundation.material,sz,12);
+  scene.remove(house.foundation);
+  state.destroyedParts++;state.score+=50;
+  showMsg('ФУНДАМЕНТ УНИЧТОЖЕН!');
+}
+
+// ============ РАКЕТЫ ============
 const rockets=[];
 function launchRocket(from,to){
   const g=new THREE.Group();
-  const body=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,2,8),new THREE.MeshLambertMaterial({color:0xcc3333}));
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,1.5,8),new THREE.MeshLambertMaterial({color:0xcc3333}));
   body.rotation.x=Math.PI/2;g.add(body);
-  const tip=new THREE.Mesh(new THREE.ConeGeometry(.25,.6,8),new THREE.MeshLambertMaterial({color:0x333333}));
-  tip.rotation.x=Math.PI/2;tip.position.z=1.3;g.add(tip);
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(.2,.5,8),new THREE.MeshLambertMaterial({color:0x333333}));
+  tip.rotation.x=Math.PI/2;tip.position.z=1;g.add(tip);
   g.position.copy(from);g.lookAt(to);scene.add(g);
   const dir=to.clone().sub(from).normalize();
-  rockets.push({mesh:g,vel:dir.multiplyScalar(70),life:3});
+  rockets.push({mesh:g,vel:dir.multiplyScalar(60),life:3});
+}
+function updateRockets(dt){
+  for(let i=rockets.length-1;i>=0;i--){
+    const r=rockets[i];
+    r.mesh.position.addScaledVector(r.vel,dt);
+    r.life-=dt;
+    if(Math.random()<.9){
+      const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0xaaaaaa,transparent:true,opacity:.5}));
+      sm.position.copy(r.mesh.position);sm.scale.setScalar(.5);scene.add(sm);
+      effects.push({mesh:sm,life:.8,max:.8,targetR:1.5,type:'smoke',vel:new THREE.Vector3(0,.3,0)});
+    }
+    const p=r.mesh.position;
+    const hit=p.x>-house.width/2-1&&p.x<house.width/2+1&&p.z>-house.depth/2-1&&p.z<house.depth/2+1&&p.y>0&&p.y<house.floors*house.floorHeight+3;
+    if(r.life<=0||p.y<0||hit){
+      explode(p.clone(),10,15,false);
+      scene.remove(r.mesh);rockets.splice(i,1);
+    }
+  }
 }
 
-// ==== САМОЛЁТ ИГРОКА ====
-let playerPlane=null;
-const planeBodyGeo=new THREE.CylinderGeometry(.9,.9,9,12),planeMat=new THREE.MeshLambertMaterial({color:0xdddddd});
-const wingMat=new THREE.MeshLambertMaterial({color:0xcccccc}),engMat=new THREE.MeshLambertMaterial({color:0x333333});
-function mkPlane(){
-  const g=new THREE.Group();
-  const b=new THREE.Mesh(planeBodyGeo,planeMat);b.rotation.z=Math.PI/2;g.add(b);
-  const n=new THREE.Mesh(new THREE.ConeGeometry(.9,2,12),planeMat);n.rotation.z=-Math.PI/2;n.position.x=5.5;g.add(n);
-  const w=new THREE.Mesh(new THREE.BoxGeometry(3,.3,14),wingMat);w.position.x=.5;g.add(w);
-  const th=new THREE.Mesh(new THREE.BoxGeometry(2,2.5,.3),wingMat);th.position.set(-4,1.3,0);g.add(th);
-  const tv=new THREE.Mesh(new THREE.BoxGeometry(1.5,.3,4),wingMat);tv.position.set(-4,1,0);g.add(tv);
-  for(const zz of[-2.5,2.5]){
-    const e=new THREE.Mesh(new THREE.CylinderGeometry(.6,.6,3,10),engMat);
-    e.rotation.z=Math.PI/2;e.position.set(0,-1,zz);g.add(e);
+// ============ ОБНОВЛЕНИЕ ЭФФЕКТОВ ============
+function updateEffects(dt){
+  for(let i=effects.length-1;i>=0;i--){
+    const e=effects[i];
+    e.life-=dt;
+    const k=Math.max(0,e.life/e.max);
+    if(e.mesh){
+      if(e.type==='stem')e.mesh.material.opacity=.7*k;
+      else if(e.type==='fireball'){
+        e.mesh.scale.setScalar(Math.max(.1,e.targetR*(1-k*k)));
+        e.mesh.material.opacity=k;
+      } else if(e.type==='smoke'){
+        e.mesh.scale.setScalar(Math.max(.1,e.targetR*(1-k*k)));
+        e.mesh.material.opacity=k*.6;
+      }
+      if(e.vel)e.mesh.position.addScaledVector(e.vel,dt);
+      if(e.life<=0){scene.remove(e.mesh);effects.splice(i,1);}
+    } else if(e.light){
+      e.light.intensity=(e.max>.5?1000:400)*k;
+      if(e.life<=0){scene.remove(e.light);effects.splice(i,1);}
+    }
   }
-  return g;
 }
-function launchPlane(){
-  const g=mkPlane();
-  g.position.set(-75,2.5,airportZ);g.rotation.y=Math.PI;
-  scene.add(g);
-  playerPlane={mesh:g,speed:0,maxSpeed:60,flying:false};
-  document.getElementById('pControls').classList.add('on');
-  document.getElementById('exit').classList.add('on');
-  document.getElementById('hudWrap').style.opacity='.4';
-  controls.enabled=false;
-}
-function updatePlane(dt){
-  if(!playerPlane)return;
-  const p=playerPlane;
-  if(!p.flying){
-    p.speed=Math.min(p.maxSpeed,p.speed+22*dt);
-    p.mesh.position.x+=p.speed*dt;
-    if(p.speed>42&&p.mesh.position.x>20)p.flying=true;
-  }else{
-    p.speed=Math.min(p.maxSpeed,p.speed+5*dt);
-    if(planeInput.left)p.mesh.rotation.y+=1.3*dt;
-    if(planeInput.right)p.mesh.rotation.y-=1.3*dt;
-    if(planeInput.up)p.mesh.position.y+=27*dt;
-    if(planeInput.down)p.mesh.position.y-=27*dt;
-    if(p.mesh.position.y<12)p.mesh.position.y=12;
-    const fwd=new THREE.Vector3(1,0,0).applyEuler(p.mesh.rotation);
-    p.mesh.position.addScaledVector(fwd,p.speed*dt);
-  }
-  if(Math.random()<.4){
-    const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0x666666,transparent:true,opacity:.5}));
-    sm.position.copy(p.mesh.position);sm.position.y-=1;sm.scale.setScalar(.8+Math.random()*.5);scene.add(sm);
-    fx.push({mesh:sm,life:1.2,max:1.2,targetR:3,type:'smoke',vel:new THREE.Vector3(0,.5,0)});
-  }
-  if(p.mesh.position.y<1){explode(p.mesh.position.clone(),25,35,false);scene.remove(p.mesh);playerPlane=null;endPlane();return;}
-  for(const b of buildings){
-    if(!b.userData.alive)continue;
-    const dx=p.mesh.position.x-b.position.x,dz=p.mesh.position.z-b.position.z;
-    if(Math.abs(dx)<b.userData.width/2+1.5&&Math.abs(dz)<b.userData.depth/2+1.5){
-      if(p.mesh.position.y>b.position.y&&p.mesh.position.y<b.userData.floors*FLOOR_H+2){
-        let hf=Math.floor((p.mesh.position.y-b.position.y)/FLOOR_H);
-        hf=Math.max(0,Math.min(hf,b.userData.floors-1));
-        const hp=p.mesh.position.clone();
-        const pm=[planeMat,wingMat,engMat];
-        for(let k=0;k<14;k++)spawnDebris(hp,pm[k%3],new THREE.Vector3(1.2,1,1.2),25);
-        const fm=new THREE.MeshBasicMaterial({color:0xffaa33,transparent:true,opacity:.95});
-        const fs=new THREE.Mesh(expGeo,fm);fs.position.copy(hp);scene.add(fs);
-        fx.push({mesh:fs,life:.6,max:.6,targetR:16,type:'fireball'});
-        const data=b.userData;const top=b.userData.floors-1;
-        for(let fi=top;fi>=hf;fi--){
-          if(data.destroyed.has(fi))continue;
-          collapseQ.push({b,fi,time:(top-fi)*.1});
+
+// ============ ОБНОВЛЕНИЕ ОБЛОМКОВ (разбиение крупных) ============
+function updateDebris(dt){
+  for(let i=debris.length-1;i>=0;i--){
+    const d=debris[i];
+    d.vel.y-=22*dt;
+    d.mesh.position.addScaledVector(d.vel,dt);
+
+    if(d.mesh.position.y<0.3){
+      d.mesh.position.y=0.3;
+
+      if(d.isBig&&!d.broken){
+        d.broken=true;
+        for(let k=0;k<3+Math.floor(Math.random()*2);k++){
+          const smallSize=new THREE.Vector3(d.size.x*0.4,d.size.y*0.4,d.size.z*0.4);
+          const mesh=new THREE.Mesh(debrisGeo,d.material);
+          mesh.scale.copy(smallSize);
+          mesh.position.copy(d.mesh.position);
+          mesh.position.x+=(Math.random()-.5)*d.size.x;
+          mesh.position.y+=Math.random()*d.size.y*0.5;
+          mesh.position.z+=(Math.random()-.5)*d.size.z;
+          scene.add(mesh);
+          debris.push({
+            mesh:mesh,
+            vel:new THREE.Vector3((Math.random()-.5)*8,Math.random()*4+2,(Math.random()-.5)*8),
+            rot:new THREE.Vector3((Math.random()-.5)*6,(Math.random()-.5)*6,(Math.random()-.5)*6),
+            life:100,material:d.material,isBig:false
+          });
         }
-        igniteBuilding(b);
-        scene.remove(p.mesh);playerPlane=null;endPlane();return;
+        d.mesh.scale.multiplyScalar(0.7);
       }
-    }
-  }
-  for(const w of windmills){
-    if(w.userData.falling)continue;
-    const dd=Math.hypot(p.mesh.position.x-w.position.x,p.mesh.position.z-w.position.z);
-    if(dd<5&&p.mesh.position.y>15&&p.mesh.position.y<35){
-      w.userData.falling=true;
-      const dx=w.position.x-p.mesh.position.x,dz=w.position.z-p.mesh.position.z,dist=Math.hypot(dx,dz)||1;
-      w.userData.vel.set(dx/dist*15,5,dz/dist*15);
-      w.userData.rot.set((Math.random()-.5)*3,(Math.random()-.5)*3,(Math.random()-.5)*3);
-      for(const bl of w.userData.blades){
-        const wp=new THREE.Vector3();bl.getWorldPosition(wp);
-        const bm=bl.children[0];
-        if(bm){for(let k=0;k<4;k++)spawnDebris(wp,bm.material,new THREE.Vector3(1,4,.3),20);bl.remove(bm);}
-      }
-      const hp=p.mesh.position.clone();
-      const pm=[planeMat,wingMat,engMat];
-      for(let k=0;k<16;k++)spawnDebris(hp,pm[k%3],new THREE.Vector3(1.2,1,1.2),28);
-      const fm=new THREE.MeshBasicMaterial({color:0xffaa33,transparent:true,opacity:.95});
-      const fs=new THREE.Mesh(expGeo,fm);fs.position.copy(hp);scene.add(fs);
-      fx.push({mesh:fs,life:.7,max:.7,targetR:20,type:'fireball'});
-      scene.remove(p.mesh);playerPlane=null;endPlane();return;
-    }
-  }
-  const fwd=new THREE.Vector3(1,0,0).applyEuler(p.mesh.rotation);
-  const camOffset=fwd.clone().multiplyScalar(-22);camOffset.y+=8;
-  camera.position.copy(p.mesh.position).add(camOffset);
-  camera.lookAt(p.mesh.position.clone().addScaledVector(fwd,20));
-}
-function endPlane(){
-  controls.enabled=true;controls.target.set(0,5,0);
-  camera.position.set(50,60,100);
-  document.getElementById('pControls').classList.remove('on');
-  document.getElementById('exit').classList.remove('on');
-  document.getElementById('hudWrap').style.opacity='1';
-}
-const planeInput={left:false,right:false,up:false,down:false};
-function bindH(id,k){
-  const el=document.getElementById(id);
-  el.addEventListener('touchstart',e=>{e.preventDefault();planeInput[k]=true;},{passive:false});
-  el.addEventListener('touchend',e=>{e.preventDefault();planeInput[k]=false;},{passive:false});
-}
-bindH('pL','left');bindH('pR','right');bindH('pU','up');bindH('pD','down');
-document.getElementById('exit').addEventListener('click',()=>{
-  if(playerPlane){scene.remove(playerPlane.mesh);playerPlane=null;}
-  endPlane();
-});
 
-// ==== КАМЕРА ====
-let camTheta=Math.PI/4,camPhi=Math.PI/3,camDist=140;
-const camTarget=new THREE.Vector3(0,5,0);
-const controls={enabled:true,update(){
-  if(!this.enabled)return;
-  camPhi=Math.max(.2,Math.min(Math.PI/2.05,camPhi));
-  camDist=Math.max(30,Math.min(300,camDist));
-  camera.position.x=camTarget.x+camDist*Math.sin(camPhi)*Math.cos(camTheta);
-  camera.position.y=camTarget.y+camDist*Math.cos(camPhi);
-  camera.position.z=camTarget.z+camDist*Math.sin(camPhi)*Math.sin(camTheta);
-  camera.lookAt(camTarget);
-  // землетрясение трясёт камеру
-  if(quake){
-    camera.position.x+=quake.shake*3;
-    camera.position.y+=quake.shake*2;
+      d.vel.y*=-0.2;
+      d.vel.x*=0.6;
+      d.vel.z*=0.6;
+    }
+
+    d.mesh.rotation.x+=d.rot.x*dt;
+    d.mesh.rotation.y+=d.rot.y*dt;
+    d.mesh.rotation.z+=d.rot.z*dt;
+
+    d.life-=dt;
+    if(d.life<0){scene.remove(d.mesh);debris.splice(i,1);}
   }
-}};
+}
+
+// ============ УПРАВЛЕНИЕ КАМЕРОЙ ============
 let touchStart=null,pinchStart=0;
-renderer.domElement.addEventListener('touchstart',e=>{
-  if(e.touches.length===1){touchStart={x:e.touches[0].clientX,y:e.touches[0].clientY,t:Date.now(),moved:false};}
-  else if(e.touches.length===2){
+const dom=renderer.domElement;
+
+dom.addEventListener('touchstart',e=>{
+  if(e.target.closest('#toolsBar')||e.target.closest('#camBtns')||e.target.closest('#msg')||e.target.closest('#startHint'))return;
+  if(e.touches.length===1){
+    touchStart={x:e.touches[0].clientX,y:e.touches[0].clientY,t:Date.now(),moved:false};
+  } else if(e.touches.length===2){
     pinchStart=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
     touchStart=null;
   }
 },{passive:true});
-renderer.domElement.addEventListener('touchmove',e=>{
-  if(e.touches.length===1&&touchStart&&controls.enabled){
-    const dx=e.touches[0].clientX-touchStart.x,dy=e.touches[0].clientY-touchStart.y;
+
+dom.addEventListener('touchmove',e=>{
+  if(e.touches.length===1&&touchStart){
+    const dx=e.touches[0].clientX-touchStart.x;
+    const dy=e.touches[0].clientY-touchStart.y;
     if(Math.hypot(dx,dy)>5)touchStart.moved=true;
-    camTheta-=dx*.01;camPhi-=dy*.01;
-    touchStart.x=e.touches[0].clientX;touchStart.y=e.touches[0].clientY;
-  }else if(e.touches.length===2&&pinchStart){
+    state.camTheta-=dx*.01;
+    state.camPhi-=dy*.01;
+    state.camPhi=Math.max(.2,Math.min(Math.PI/2.05,state.camPhi));
+    touchStart.x=e.touches[0].clientX;
+    touchStart.y=e.touches[0].clientY;
+  } else if(e.touches.length===2&&pinchStart){
     const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-    camDist*=pinchStart/d;pinchStart=d;
+    state.camDist*=pinchStart/d;
+    state.camDist=Math.max(20,Math.min(200,state.camDist));
+    pinchStart=d;
   }
 },{passive:true});
-renderer.domElement.addEventListener('touchend',e=>{
-  if(touchStart&&!touchStart.moved&&Date.now()-touchStart.t<400&&!playerPlane)handleTap(touchStart.x,touchStart.y);
+
+dom.addEventListener('touchend',e=>{
+  if(touchStart&&!touchStart.moved&&Date.now()-touchStart.t<400)handleTap(touchStart.x,touchStart.y);
   touchStart=null;pinchStart=0;
 },{passive:true});
 
-// ==== HUD — 2 РЯДА КНОПОК ====
-let page=1;
-document.getElementById('pageDots').addEventListener('click',()=>togglePage());
-function togglePage(){
-  page=page===1?2:1;
-  const w=document.getElementById('hudWrap');
-  const r1=document.getElementById('hudRow1');
-  const r2=document.getElementById('hudRow2');
-  const dots=document.querySelectorAll('.dot');
-  if(page===1){r1.style.display='flex';r2.style.display='none';dots[0].classList.add('on');dots[1].classList.remove('on');}
-  else{r1.style.display='none';r2.style.display='flex';dots[0].classList.remove('on');dots[1].classList.add('on');}
-}
-// свайп по панели кнопок
-let hudTouchX=null;
-document.getElementById('hudWrap').addEventListener('touchstart',e=>{
-  if(e.touches.length===1)hudTouchX=e.touches[0].clientX;
-},{passive:true});
-document.getElementById('hudWrap').addEventListener('touchend',e=>{
-  if(hudTouchX!==null){
-    const dx=(e.changedTouches[0].clientX-hudTouchX);
-    if(Math.abs(dx)>50)togglePage();
-    hudTouchX=null;
-  }
-},{passive:true});
-
-let mode='bomb';
-document.querySelectorAll('.btn').forEach(b=>{
-  b.addEventListener('click',()=>{
-    document.querySelectorAll('.btn').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');mode=b.dataset.mode;
-    if(mode==='plane')launchPlane();
-    if(mode==='heli')spawnHeli();
-    if(mode==='tornado')spawnTornado();
-    if(mode==='tsunami')spawnTsunami();
-    if(mode==='quake')spawnQuake();
-  });
+// ПК
+let mouseDown=false,mouseX=0,mouseY=0;
+dom.addEventListener('mousedown',e=>{
+  if(e.target.closest('#toolsBar')||e.target.closest('#camBtns'))return;
+  mouseDown=true;mouseX=e.clientX;mouseY=e.clientY;
+});
+dom.addEventListener('mousemove',e=>{
+  if(!mouseDown)return;
+  const dx=e.clientX-mouseX,dy=e.clientY-mouseY;
+  state.camTheta-=dx*.01;state.camPhi-=dy*.01;
+  state.camPhi=Math.max(.2,Math.min(Math.PI/2.05,state.camPhi));
+  mouseX=e.clientX;mouseY=e.clientY;
+});
+dom.addEventListener('mouseup',()=>{mouseDown=false;});
+dom.addEventListener('click',e=>{
+  if(e.target.closest('#toolsBar')||e.target.closest('#camBtns'))return;
+  handleTap(e.clientX,e.clientY);
 });
 
-const raycaster=new THREE.Raycaster(),ndc=new THREE.Vector2();
-function aim(x,y){
-  ndc.x=(x/innerWidth)*2-1;ndc.y=-(y/innerHeight)*2+1;
+// ============ ТАП ============
+const raycaster=new THREE.Raycaster();
+const ndc=new THREE.Vector2();
+
+function getAimPoint(cx,cy){
+  ndc.x=(cx/innerWidth)*2-1;
+  ndc.y=-(cy/innerHeight)*2+1;
   raycaster.setFromCamera(ndc,camera);
-  const t=[];scene.traverse(o=>{if(o.isMesh&&o!==ground&&o!==river)t.push(o);});
-  const h=raycaster.intersectObjects(t,false);
-  if(h.length)return h[0].point.clone();
-  const hg=raycaster.intersectObject(ground,false);
-  if(hg.length)return hg[0].point.clone();
+  const targets=[];
+  scene.traverse(o=>{if(o.isMesh&&o!==ground&&o!==sidewalk&&o!==road)targets.push(o);});
+  const hits=raycaster.intersectObjects(targets,false);
+  if(hits.length>0)return hits[0].point.clone();
+  const gHit=raycaster.intersectObject(ground,false);
+  if(gHit.length>0)return gHit[0].point.clone();
   return null;
 }
+
 function handleTap(x,y){
-  if(playerPlane)return;
-  const p=aim(x,y);if(!p)return;
-  if(mode==='bomb')explode(p,20,22,false);
-  else if(mode==='grenade')explode(p,9,10,false);
-  else if(mode==='rocket')launchRocket(camera.position.clone(),p);
-  else if(mode==='nuke')explode(p,60,60,true);
-  else if(mode==='fire'){
-    // найти ближайшее здание и поджечь
-    let best=null,bd=999;
-    for(const b of buildings){
-      if(!b.userData.alive)continue;
-      const dd=Math.hypot(b.position.x-p.x,b.position.z-p.z);
-      if(dd<bd){bd=dd;best=b;}
+  const p=getAimPoint(x,y);
+  if(!p)return;
+  const tool=state.tool;
+  if(tool==='bomb')explode(p,12,15,false);
+  else if(tool==='dynamite'){explode(p,18,22,false);ignite(p);}
+  else if(tool==='rocket')launchRocket(camera.position.clone(),p);
+  else if(tool==='lightning')strikeLightning(p);
+  else if(tool==='fire')ignite(p);
+  else if(tool==='water'){
+    extinguish(p,15);
+    for(let k=0;k<6;k++){
+      const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0x66aaff,transparent:true,opacity:.7}));
+      sm.position.copy(p);
+      sm.position.x+=(Math.random()-.5)*6;
+      sm.position.y+=(Math.random()-.5)*6;
+      sm.position.z+=(Math.random()-.5)*6;
+      sm.scale.setScalar(1.5);
+      scene.add(sm);
+      effects.push({mesh:sm,life:1.5,max:1.5,targetR:3,type:'smoke',vel:new THREE.Vector3(0,-1,0)});
     }
-    if(best&&bd<40)igniteBuilding(best);
-  }
-  else if(mode==='lightning')strikeLightning(p);
-  else if(mode==='cluster')dropCluster(p);
+  } else if(tool==='nuke')explode(p,45,50,true);
 }
 
-// ==== ЦИКЛ ====
-const cl=new THREE.Clock();
+function strikeLightning(pos){
+  const pts=[new THREE.Vector3(pos.x,200,pos.z),new THREE.Vector3(pos.x+5,100,pos.z+3),new THREE.Vector3(pos.x-3,50,pos.z-2),new THREE.Vector3(pos.x,pos.y,pos.z)];
+  const geo=new THREE.BufferGeometry().setFromPoints(pts);
+  const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xaaddff,linewidth:3}));
+  scene.add(line);
+  setTimeout(()=>scene.remove(line),250);
+  const fl=document.createElement('div');
+  fl.style.cssText='position:fixed;inset:0;background:#fff;z-index:30;pointer-events:none;transition:opacity .3s';
+  document.body.appendChild(fl);
+  setTimeout(()=>{fl.style.opacity='0';setTimeout(()=>fl.remove(),400);},50);
+  explode(pos,15,20,false);
+  ignite(pos);
+}
+
+// ============ КНОПКИ ИНСТРУМЕНТОВ ============
+document.querySelectorAll('.tool').forEach(b=>{
+  const h=function(e){
+    e.preventDefault();e.stopPropagation();
+    document.querySelectorAll('.tool').forEach(t=>t.classList.remove('active'));
+    b.classList.add('active');
+    state.tool=b.dataset.tool;
+    if(navigator.vibrate)navigator.vibrate(20);
+  };
+  b.addEventListener('click',h);
+  b.addEventListener('touchstart',h,{passive:false});
+});
+
+// ============ КАМЕРА ============
+document.getElementById('camTop').addEventListener('click',()=>{state.camPhi=0.25;state.camTheta=Math.PI/4;state.camDist=100;});
+document.getElementById('camReset').addEventListener('click',()=>{state.camPhi=Math.PI/3;state.camTheta=Math.PI/4;state.camDist=80;});
+
+// ============ ПОДСКАЗКА ============
+document.getElementById('startHint').addEventListener('click',function(){this.classList.add('hidden');});
+function showMsg(text){
+  const m=document.getElementById('msg');
+  m.textContent=text;m.classList.add('on');
+  clearTimeout(m._t);
+  m._t=setTimeout(()=>m.classList.remove('on'),2500);
+}
+
+// ============ HUD ============
+function updateHUD(){
+  const pct=Math.round(state.destroyedParts/state.totalParts*100);
+  document.getElementById('destroyVal').textContent=pct+'%';
+  document.getElementById('scoreVal').textContent=state.score;
+  const aliveFloors=house.floorObjects.filter(f=>f.userData.collapsed!==true).length;
+  document.getElementById('floorsVal').textContent=aliveFloors+'/'+house.floors;
+}
+
+// ============ КАМЕРА ============
+function updateCamera(){
+  const phi=state.camPhi,theta=state.camTheta,dist=state.camDist;
+  camera.position.x=state.camTarget.x+dist*Math.sin(phi)*Math.cos(theta);
+  camera.position.y=state.camTarget.y+dist*Math.cos(phi);
+  camera.position.z=state.camTarget.z+dist*Math.sin(phi)*Math.sin(theta);
+  camera.lookAt(state.camTarget);
+}
+
+// ============ ЦИКЛ ============
+const clock=new THREE.Clock();
+let hudTimer=0;
 function loop(){
   requestAnimationFrame(loop);
-  const dt=Math.min(cl.getDelta(),.05);
-  processQ(dt);
+  const dt=Math.min(clock.getDelta(),0.05);
+  updateCamera();
+  updateDebris(dt);
+  updateEffects(dt);
   updateFires(dt);
-  updateHelis(dt);
-  updateTornado(dt);
-  updateTsunami(dt);
-  updateQuake(dt);
-  for(let i=debris.length-1;i>=0;i--){
-    const d=debris[i];d.vel.y-=22*dt;d.mesh.position.addScaledVector(d.vel,dt);
-    if(d.mesh.position.y<.3){d.mesh.position.y=.3;d.vel.y*=-.25;d.vel.x*=.7;d.vel.z*=.7;}
-    d.mesh.rotation.x+=d.rot.x*dt;d.mesh.rotation.y+=d.rot.y*dt;d.mesh.rotation.z+=d.rot.z*dt;
-    d.life-=dt;
-    if(d.life<10){d.mesh.material.transparent=true;d.mesh.material.opacity=Math.max(.1,d.life/10);}
-    if(d.life<0){scene.remove(d.mesh);debris.splice(i,1);}
-  }
-  for(let i=fx.length-1;i>=0;i--){
-    const e=fx[i];e.life-=dt;const k=Math.max(0,e.life/e.max);
-    if(e.mesh){
-      if(e.type==='stem'){e.mesh.material.opacity=.7*k;}
-      else if(e.type==='fire'){e.mesh.scale.setScalar(2+Math.sin(Date.now()*.01)*.5);e.mesh.material.opacity=k;}
-      else{
-        const s=e.targetR*(1-k*k);e.mesh.scale.setScalar(Math.max(.1,s));
-        e.mesh.material.opacity=k*(e.type==='smoke'?.6:1);
-      }
-      if(e.vel)e.mesh.position.addScaledVector(e.vel,dt);
-      if(e.life<=0){scene.remove(e.mesh);fx.splice(i,1);}
-    }else if(e.light){e.light.intensity=(e.max>.5?800:300)*k;if(e.life<=0){scene.remove(e.light);fx.splice(i,1);}}
-  }
-  for(let i=rockets.length-1;i>=0;i--){
-    const r=rockets[i];r.mesh.position.addScaledVector(r.vel,dt);r.life-=dt;
-    if(Math.random()<.9){
-      const sm=new THREE.Mesh(smokeGeo,new THREE.MeshBasicMaterial({color:0xaaaaaa,transparent:true,opacity:.5}));
-      sm.position.copy(r.mesh.position);sm.scale.setScalar(.6);scene.add(sm);
-      fx.push({mesh:sm,life:.8,max:.8,targetR:1.5,type:'smoke',vel:new THREE.Vector3(0,.3,0)});
-    }
-    let hit=false;
-    for(const b of buildings){
-      if(!b.userData.alive)continue;
-      const dx=r.mesh.position.x-b.position.x,dz=r.mesh.position.z-b.position.z;
-      if(Math.abs(dx)<b.userData.width/2&&Math.abs(dz)<b.userData.depth/2&&r.mesh.position.y>0&&r.mesh.position.y<b.userData.floors*FLOOR_H){hit=true;break;}
-    }
-    if(r.life<=0||r.mesh.position.y<0||hit){
-      explode(r.mesh.position.clone(),15,18,false);
-      scene.remove(r.mesh);rockets.splice(i,1);
-    }
-  }
-  for(const car of cars){
-    const v=car.userData.vel;if(!v)continue;
-    car.position.addScaledVector(v,dt);v.y-=18*dt;
-    if(car.position.y<=0){car.position.y=0;v.y*=-.3;v.x*=.8;v.z*=.8;}
-  }
-  for(const lamp of lamps){
-    if(!lamp.userData.falling)continue;
-    const v=lamp.userData.vel;v.y-=22*dt;
-    lamp.position.addScaledVector(v,dt);
-    lamp.rotation.x+=lamp.userData.rot.x*dt;
-    lamp.rotation.y+=lamp.userData.rot.y*dt;
-    lamp.rotation.z+=lamp.userData.rot.z*dt;
-    if(lamp.position.y<0.5){lamp.position.y=0.5;v.y*=-0.2;v.x*=.6;v.z*=.6;}
-  }
-  for(const w of windmills){
-    if(!w.userData.falling){
-      for(const bl of w.userData.blades)bl.rotation.z+=0.3*dt;
-    }else{
-      const v=w.userData.vel;v.y-=20*dt;
-      w.position.addScaledVector(v,dt);
-      w.rotation.x+=w.userData.rot.x*dt;
-      w.rotation.y+=w.userData.rot.y*dt;
-      w.rotation.z+=w.userData.rot.z*dt;
-      if(w.position.y<.5){w.position.y=.5;v.y*=-.15;v.x*=.5;v.z*=.5;}
-    }
-  }
-  updatePlane(dt);
-  controls.update();
+  updateRockets(dt);
+  hudTimer+=dt;
+  if(hudTimer>0.3){hudTimer=0;updateHUD();}
   renderer.render(scene,camera);
 }
-loop();
+
 addEventListener('resize',()=>{
-  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 });
+
+loop();
 </script>
 </body>
-  </html>
+</html>
